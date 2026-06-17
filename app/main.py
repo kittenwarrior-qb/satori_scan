@@ -80,11 +80,18 @@ async def on_scan(ma_chai: str):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.config import settings
     device_manager.setup(on_scan)
     await device_manager.connect_all()
     await device_manager.start_scanners()
+    backup_task = None
+    if settings.backup_enabled:
+        from app.services.backup import backup_loop
+        backup_task = asyncio.create_task(backup_loop())
     log.info("SATORI v2 đã khởi động.")
     yield
+    if backup_task:
+        backup_task.cancel()
     await device_manager.stop_scanners()
 
 

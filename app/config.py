@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     web_port: int = 8000
     admin_password: str = "stradmin"
 
+    # ── Sao lưu DB tự động (chỉ SQLite; Postgres dùng pg_dump bên ngoài) ──
+    backup_enabled: bool = True
+    backup_interval_hours: float = 6.0   # chu kỳ sao lưu
+    backup_keep: int = 30                # giữ lại N bản mới nhất
+    backup_dir: str = "data/backups"
+
     # Chống quét trùng: cùng 1 mã quét lại trong khoảng (giây) này coi là 1 lần
     # (nhiễu băng tải / cảm biến kích 2 lần / quét tay lặp). 0 = tắt.
     classify_debounce_sec: float = 2.0

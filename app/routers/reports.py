@@ -93,6 +93,17 @@ def export_batch(so_lo_san_xuat: str, db: Session = Depends(get_db)):
     return {"path": path, "filename": os.path.basename(path)}
 
 
+@router.post("/reports/backup")
+def backup():
+    """Sao lưu DB ngay lập tức (an toàn cho SQLite)."""
+    from app.services.backup import backup_now
+    path = backup_now()
+    if not path:
+        raise HTTPException(400, "Sao lưu tự động chỉ hỗ trợ SQLite "
+                                 "(Postgres dùng pg_dump bên ngoài).")
+    return {"path": path, "filename": os.path.basename(path)}
+
+
 @router.get("/reports/download")
 def download(filename: str):
     """Tải file Excel đã xuất."""

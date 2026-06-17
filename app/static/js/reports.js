@@ -68,6 +68,13 @@ document.getElementById("btn-export-batch").onclick = async () => {
     } catch (e) { toast(e.message, "err"); }
 };
 
+document.getElementById("btn-backup").onclick = async () => {
+    try {
+        const d = await api("/api/reports/backup", "POST");
+        toast(`Đã sao lưu DB: ${d.filename}`, "ok", 4000);
+    } catch (e) { toast(e.message, "err"); }
+};
+
 // ── Cập nhật lô NCC (sửa TSD cho cả lô đang lưu hành) ──
 let _suppliers = [];
 
