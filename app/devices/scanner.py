@@ -21,11 +21,13 @@ class RealScanner(BaseScanner):
         super().__init__(on_scan)
         self.host, self.port = host, port
         self._server = None
+        self._clients = 0   # số máy scan đang thực sự kết nối tới server
 
     async def start(self):
         async def handle(reader, writer):
             peer = writer.get_extra_info("peername")
             log.info("Scanner kết nối: %s", peer)
+            self._clients += 1
             buf = b""
             try:
                 while True:
@@ -44,6 +46,8 @@ class RealScanner(BaseScanner):
                         if ma:
                             await self.on_scan(ma)
             finally:
+                self._clients = max(0, self._clients - 1)
+                log.info("Scanner ngắt kết nối: %s", peer)
                 writer.close()
 
         self._server = await asyncio.start_server(handle, self.host, self.port)
@@ -56,8 +60,9 @@ class RealScanner(BaseScanner):
             self._server.close()
 
     async def is_connected(self) -> bool:
-        # Scanner ở chế độ server: coi như sẵn sàng khi server đang chạy.
-        return self._server is not None and self._server.is_serving()
+        # Chỉ OK khi có ít nhất 1 máy scan ĐANG kết nối — không còn "ảo OK".
+        return (self._server is not None and self._server.is_serving()
+                and self._clients > 0)
 
 
 # ── MOCK: chờ inject từ API / auto random ──

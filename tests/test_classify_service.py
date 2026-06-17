@@ -42,6 +42,7 @@ def db():
 @pytest.fixture(autouse=True)
 def fake_iobox():
     device_manager.iobox = MockIOBox()
+    classify_svc._last_seen.clear()   # reset chống-quét-trùng giữa các test
 
 
 @pytest.mark.asyncio
@@ -73,3 +74,18 @@ async def test_noread(db):
 async def test_bad_format(db):
     r = await classify_svc.classify_bottle(db, "12", 1)
     assert r["ket_qua"] == "NOREAD"
+
+
+@pytest.mark.asyncio
+async def test_quet_trung_khong_tang_dem(db):
+    """Quét cùng 1 mã 2 lần liên tiếp: lần 2 là DUPLICATE, TSD không tăng tiếp."""
+    r1 = await classify_svc.classify_bottle(db, "20010800001", 1)
+    assert r1["ket_qua"] == "OK"
+    assert r1["so_lan_thuc_te"] == 1
+
+    r2 = await classify_svc.classify_bottle(db, "20010800001", 1)
+    assert r2["ket_qua"] == "DUPLICATE"
+
+    # TSD thực tế vẫn = 1 (không bị cộng nhầm thành 2)
+    bottle = classify_svc.crud.get_bottle_by_ma(db, "20010800001")
+    assert bottle.so_lan_thuc_te == 1
