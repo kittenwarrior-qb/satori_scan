@@ -45,9 +45,8 @@ async def on_scan(ma_chai: str):
             sess = crud.get_active_session(db, "PHAN_LOAI")
             if sess:
                 result = await classify_bottle(db, ma_chai, sess.id)
-                # Quét trùng (nhiễu) → bỏ qua, không broadcast/không hiển thị.
-                if result.get("ket_qua") == "DUPLICATE":
-                    return
+                # Quét trùng VẪN broadcast để UI BÁO ĐỎ cho công nhân thấy,
+                # nhưng frontend sẽ không đếm/không thêm dòng (xem classify.js).
                 result["event"] = "scan"
                 result["tong_hop_le"] = sess.tong_hop_le
                 result["tong_loi"] = sess.tong_loi
