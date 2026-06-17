@@ -30,31 +30,49 @@ logging.basicConfig(
 log = logging.getLogger("satori")
 
 
+# Tuần tự hóa xử lý quét: nhiều scanner chạy chung 1 event loop nên Lock này
+# đảm bảo đọc-ghi DB nguyên tử (không lost-update counter tái sử dụng, tránh
+# SQLite "database is locked") và chỉ 1 lệnh đẩy loại chạy mỗi lần.
+_scan_lock = asyncio.Lock()
+
+
 async def on_scan(ma_chai: str):
     """Callback chung cho mọi scanner. Xử lý PHÂN LOẠI và tự động ĐỊNH DANH."""
-    db = SessionLocal()
-    try:
-        # Chế độ PHÂN LOẠI
-        sess = crud.get_active_session(db, "PHAN_LOAI")
-        if sess:
-            result = await classify_bottle(db, ma_chai, sess.id)
-            result["event"] = "scan"
-            result["tong_hop_le"] = sess.tong_hop_le
-            result["tong_loi"] = sess.tong_loi
-            await ws_manager.broadcast(result)
-            return
+    async with _scan_lock:
+        db = SessionLocal()
+        try:
+            # Chế độ PHÂN LOẠI
+            sess = crud.get_active_session(db, "PHAN_LOAI")
+            if sess:
+                result = await classify_bottle(db, ma_chai, sess.id)
+                result["event"] = "scan"
+                result["tong_hop_le"] = sess.tong_hop_le
+                result["tong_loi"] = sess.tong_loi
+                await ws_manager.broadcast(result)
+                return
 
-        # Chế độ ĐỊNH DANH — scanner kích hoạt tự động in mã
-        sess = crud.get_active_session(db, "DINH_DANH")
-        if sess:
-            result = await identify_new_bottle(db, sess.production_batch_id, sess.id)
-            result["event"] = "print"
-            await ws_manager.broadcast(result)
-            return
+            # Chế độ ĐỊNH DANH — scanner kích hoạt tự động in mã
+            sess = crud.get_active_session(db, "DINH_DANH")
+            if sess:
+                result = await identify_new_bottle(db, sess.production_batch_id, sess.id)
+                result["event"] = "print"
+                await ws_manager.broadcast(result)
+                return
 
-        log.info("Quét '%s' — không có ca đang chạy, bỏ qua.", ma_chai)
-    finally:
-        db.close()
+            log.info("Quét '%s' — không có ca đang chạy, bỏ qua.", ma_chai)
+        except Exception:
+            # Lỗi thiết bị (IO-Box/Laser mất kết nối...) KHÔNG được làm sập
+            # vòng lắng nghe scanner. Ghi log + báo UI, rồi tiếp tục chai sau.
+            log.exception("Lỗi xử lý quét '%s'", ma_chai)
+            try:
+                await ws_manager.broadcast({
+                    "event": "error", "ma_chai": ma_chai,
+                    "message": "Lỗi xử lý — kiểm tra thiết bị/log",
+                })
+            except Exception:
+                pass
+        finally:
+            db.close()
 
 
 @asynccontextmanager

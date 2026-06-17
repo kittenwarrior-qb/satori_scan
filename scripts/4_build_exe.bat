@@ -1,5 +1,5 @@
 @echo off
-cd /d "D:\satori-v2"
+cd /d "%~dp0.."
 echo Dang dong goi SATORI thanh .exe...
 venv\Scripts\pip install pyinstaller --quiet
 venv\Scripts\pyinstaller --name satori --onefile ^

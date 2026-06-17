@@ -1,5 +1,5 @@
 @echo off
-cd /d "D:\satori-v2"
+cd /d "%~dp0.."
 echo ============================================
 echo   SATORI v2 - Kiem tra thiet bi
 echo ============================================

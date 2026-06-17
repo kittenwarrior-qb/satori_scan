@@ -34,8 +34,11 @@ class RealScanner(BaseScanner):
                         break
                     buf += chunk
                     while ETX in buf:
-                        s = buf.find(STX) + 1 if STX in buf else 0
                         e = buf.find(ETX)
+                        # STX của chính frame này = STX cuối cùng TRƯỚC ETX.
+                        # Dùng rfind để không lấy nhầm STX của frame kế tiếp.
+                        stx = buf.rfind(STX, 0, e)
+                        s = stx + 1 if stx != -1 else 0
                         ma = buf[s:e].decode(errors="ignore").strip()
                         buf = buf[e + 1:]
                         if ma:
