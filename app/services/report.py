@@ -1,6 +1,7 @@
 """Xuất báo cáo Excel (tương thích format CodeIT cũ) + báo cáo theo ca/ngày."""
 import os
 from datetime import datetime, time, timedelta
+from typing import Dict, Optional
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -30,7 +31,7 @@ def _style_header(ws, ncols: int):
 
 
 def shift_summary(db: Session, from_date=None, to_date=None,
-                  che_do: str | None = None) -> dict:
+                  che_do: Optional[str] = None) -> dict:
     """Tổng hợp theo CA (mỗi phiên sản xuất) trong khoảng ngày.
 
     Trả về từng ca + thống kê hợp lệ/lỗi/tỉ lệ + phân tích nguyên nhân lỗi.
@@ -46,7 +47,7 @@ def shift_summary(db: Session, from_date=None, to_date=None,
     sessions = q.order_by(models.Session.bat_dau.desc()).all()
 
     # Phân tích nguyên nhân lỗi: gom scan_events theo (session, ket_qua) 1 lần.
-    bd: dict[int, dict[str, int]] = {}
+    bd: Dict[int, Dict[str, int]] = {}
     ids = [s.id for s in sessions]
     if ids:
         rows = (db.query(models.ScanEvent.session_id, models.ScanEvent.ket_qua,
@@ -89,7 +90,7 @@ def shift_summary(db: Session, from_date=None, to_date=None,
 
 
 def export_shifts(db: Session, from_date=None, to_date=None,
-                  che_do: str | None = None) -> str:
+                  che_do: Optional[str] = None) -> str:
     """Xuất báo cáo theo ca ra data/reports/ShiftReport.xlsx."""
     os.makedirs(REPORT_DIR, exist_ok=True)
     data = shift_summary(db, from_date, to_date, che_do)
@@ -150,7 +151,7 @@ def export_production_report(db: Session) -> str:
     return path
 
 
-def export_batch_detail(db: Session, so_lo_san_xuat: str) -> str | None:
+def export_batch_detail(db: Session, so_lo_san_xuat: str) -> Optional[str]:
     """Chi tiết chai theo 1 lô SX -> data/reports/<SoLoSX>.xlsx."""
     batch = (db.query(models.ProductionBatch)
              .filter(models.ProductionBatch.so_lo_san_xuat == so_lo_san_xuat)

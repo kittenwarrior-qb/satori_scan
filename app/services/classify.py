@@ -1,6 +1,7 @@
 """Logic PHÂN LOẠI chai — trái tim hệ thống. Quyết định OK hay loại."""
 import logging
 import time
+from typing import Dict
 
 from sqlalchemy.orm import Session
 
@@ -13,7 +14,7 @@ log = logging.getLogger("satori.classify")
 
 # Thời điểm quét gần nhất theo từng mã (chống quét trùng). Vì on_scan chạy dưới
 # 1 asyncio.Lock chung nên truy cập dict này không có tranh chấp.
-_last_seen: dict[str, float] = {}
+_last_seen: Dict[str, float] = {}
 
 
 def _seen_recently(ma_chai: str, window: float) -> bool:

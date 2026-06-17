@@ -11,13 +11,14 @@ import logging
 import os
 import sqlite3
 from datetime import datetime
+from typing import Optional
 
 from app.config import settings
 
 log = logging.getLogger("satori.backup")
 
 
-def _sqlite_path() -> str | None:
+def _sqlite_path() -> Optional[str]:
     """Đường dẫn file SQLite từ DATABASE_URL, hoặc None nếu không phải SQLite."""
     url = settings.database_url
     if not url.startswith("sqlite"):
@@ -25,7 +26,7 @@ def _sqlite_path() -> str | None:
     return url.split("sqlite:///", 1)[-1]
 
 
-def backup_now() -> str | None:
+def backup_now() -> Optional[str]:
     """Tạo 1 bản sao lưu ngay. Trả đường dẫn file backup, hoặc None nếu bỏ qua."""
     src = _sqlite_path()
     if src is None:

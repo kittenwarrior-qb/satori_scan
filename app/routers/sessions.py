@@ -1,4 +1,6 @@
 """API quản lý ca/phiên sản xuất + trạng thái thiết bị."""
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -45,7 +47,7 @@ async def end(che_do: str, db: Session = Depends(get_db)):
 
 
 @router.get("/sessions/active")
-def active(che_do: str | None = None, db: Session = Depends(get_db)):
+def active(che_do: Optional[str] = None, db: Session = Depends(get_db)):
     s = crud.get_active_session(db, che_do)
     if not s:
         return {"active": False}

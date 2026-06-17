@@ -8,11 +8,12 @@ import webbrowser
 import uvicorn
 
 from app.config import settings
+from app.main import app as fastapi_app
 
 
 def start_server():
     uvicorn.run(
-        "app.main:app",
+        fastapi_app,
         host="127.0.0.1",
         port=settings.web_port,
         log_level="info",
@@ -25,16 +26,20 @@ def open_kiosk():
     chrome_paths = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        os.path.expandvars(r"%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe"),
         r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
         r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     ]
     browser = next((p for p in chrome_paths if os.path.exists(p)), None)
     if browser:
+        # --app: cửa sổ sạch (không tab, không thanh địa chỉ) NHƯNG vẫn còn
+        # khung cửa sổ có nút X để chạm tay đóng — quan trọng với máy cảm ứng
+        # không có bàn phím. (Muốn khóa cứng toàn màn hình sau này thì thêm
+        # lại "--kiosk", nhưng lúc đó phải có cách thoát khác.)
         subprocess.Popen([
             browser,
-            "--kiosk",
             f"--app={url}",
-            "--window-size=1024,768",   # khớp độ phân giải màn hình công nghiệp
+            "--start-maximized",        # phóng to gần kín màn hình
             "--force-device-scale-factor=1",  # không để Chrome tự zoom
             "--disable-pinch",          # tắt zoom cảm ứng
             "--overscroll-history-navigation=0",

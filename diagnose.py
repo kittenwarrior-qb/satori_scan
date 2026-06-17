@@ -1,41 +1,45 @@
 #!/usr/bin/env python3
 """
-diagnose.py — Chạy tại nhà máy để kiểm tra từng thiết bị trước khi cài chính thức.
+diagnose.py - Chay tai nha may de kiem tra tung thiet bi truoc khi cai chinh thuc.
 
-  python diagnose.py                  # menu chọn
-  python diagnose.py scanner          # sniff scanner TCP
-  python diagnose.py laser <IP> <PORT>
-  python diagnose.py iobox <IP> <COIL>
+  diagnose.exe                  # menu chon
+  diagnose.exe scanner          # sniff scanner TCP
+  diagnose.exe laser <IP> <PORT>
+  diagnose.exe iobox <IP> <COIL>
+
+LUU Y: Khong chay diagnose VA satori cung luc - ca hai deu dung cong 51236,
+chi mot ben giu duoc. Test scanner xong phai DONG diagnose roi moi chay satori.
 """
 import asyncio, socket, sys, textwrap, time
 
 
-# ───────────────────────────────────────────────
-# 1. SCANNER — lắng nghe TCP, in raw bytes + text
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
+# 1. SCANNER - lang nghe TCP, in raw bytes + text
+# ---------------------------------------------------------------
 async def _scanner_server(host="0.0.0.0", port=51236):
-    print(f"\n[Scanner] Đang lắng nghe tại {host}:{port}  (Ctrl+C để dừng)\n"
-          f"  → Để máy scan kết nối vào IP máy tính này, port {port}\n")
+    print(f"\n[Scanner] Dang lang nghe tai {host}:{port}  (Ctrl+C de dung)\n"
+          f"  -> De may scan ket noi vao IP may tinh nay, port {port}\n"
+          f"  -> Nho: dong CodeIT va satori.exe truoc, neu khong se ket noi nham!\n")
 
     async def handle(reader, writer):
         addr = writer.get_extra_info("peername")
-        print(f"  ✅ Scanner kết nối từ {addr}")
+        print(f"  [OK] Scanner ket noi tu {addr}")
         buf = b""
         while True:
             chunk = await reader.read(256)
             if not chunk:
-                print(f"  ⚠ Scanner {addr} ngắt kết nối")
+                print(f"  [!] Scanner {addr} ngat ket noi")
                 break
             buf += chunk
-            # In raw hex + text để xác định framing (STX/ETX, newline, ...)
+            # In raw hex + text de xac dinh framing (STX/ETX, newline, ...)
             print(f"  RAW hex : {chunk.hex()}")
             print(f"  RAW text: {chunk!r}")
-            # Tìm STX/ETX
+            # Tim STX/ETX
             while b"\x02" in buf and b"\x03" in buf:
                 s = buf.index(b"\x02")
                 e = buf.index(b"\x03", s)
                 payload = buf[s+1:e].decode(errors="replace")
-                print(f"  >>> MÃ  : {payload!r}")
+                print(f"  >>> MA  : {payload!r}")
                 buf = buf[e+1:]
 
     srv = await asyncio.start_server(handle, host, port)
@@ -47,20 +51,23 @@ def run_scanner(port=51236):
     try:
         asyncio.run(_scanner_server(port=int(port)))
     except KeyboardInterrupt:
-        print("\n[Scanner] Đã dừng.")
+        print("\n[Scanner] Da dung.")
+    except OSError as e:
+        print(f"\n[Scanner] LOI mo cong {port}: {e}")
+        print("  -> Cong dang bi chiem. Dong CodeIT / satori.exe roi thu lai.")
 
 
-# ───────────────────────────────────────────────
-# 2. LASER — gửi lệnh thử nghiệm
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
+# 2. LASER - gui lenh thu nghiem
+# ---------------------------------------------------------------
 def run_laser(host, port, template=None):
     port = int(port)
     ma   = "TEST-" + time.strftime("%H%M%S")
     tmpl = template or "PRINT|{code}\r\n"
     cmd  = tmpl.format(code=ma).encode()
 
-    print(f"\n[Laser] Kết nối {host}:{port}")
-    print(f"        Gửi   : {cmd!r}")
+    print(f"\n[Laser] Ket noi {host}:{port}")
+    print(f"        Gui   : {cmd!r}")
     try:
         s = socket.create_connection((host, port), timeout=5)
         s.sendall(cmd)
@@ -77,54 +84,54 @@ def run_laser(host, port, template=None):
             pass
         s.close()
         if reply:
-            print(f"        Phản hồi: {reply!r}")
+            print(f"        Phan hoi: {reply!r}")
         else:
-            print("        Không có phản hồi (bình thường với một số hãng)")
-        print("  ✅ Gửi thành công — kiểm tra máy in xem có in không")
+            print("        Khong co phan hoi (binh thuong voi mot so hang)")
+        print("  [OK] Gui thanh cong - kiem tra may in xem co in khong")
     except Exception as e:
-        print(f"  ❌ Lỗi: {e}")
+        print(f"  [LOI] {e}")
         print(textwrap.dedent("""
-  Gợi ý:
-    • Kiểm tra IP và port trong .env (LASER_HOST / LASER_PORT)
-    • Thử ping IP máy in từ cmd: ping <IP>
-    • Xem tài liệu hãng để tìm format lệnh, rồi đặt LASER_CMD_TEMPLATE trong .env
-      Ví dụ: LASER_CMD_TEMPLATE={code}\\r\\n
+  Goi y:
+    - Kiem tra IP va port trong .env (LASER_HOST / LASER_PORT)
+    - Thu ping IP may in tu cmd: ping <IP>
+    - Xem tai lieu hang de tim format lenh, roi dat LASER_CMD_TEMPLATE trong .env
+      Vi du: LASER_CMD_TEMPLATE={code}\\r\\n
         """))
 
 
-# ───────────────────────────────────────────────
-# 3. IO-BOX — test ModBus coil
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
+# 3. IO-BOX - test ModBus coil
+# ---------------------------------------------------------------
 async def _iobox_test(host, port, coil):
     try:
         from pymodbus.client import AsyncModbusTcpClient
     except ImportError:
-        print("  ❌ Chưa cài pymodbus: pip install pymodbus")
+        print("  [LOI] Chua cai pymodbus: pip install pymodbus")
         return
 
     client = AsyncModbusTcpClient(host, port=port)
-    print(f"\n[IO-Box] Kết nối ModBus TCP {host}:{port}  coil={coil}")
+    print(f"\n[IO-Box] Ket noi ModBus TCP {host}:{port}  coil={coil}")
     await client.connect()
     if not client.connected:
-        print("  ❌ Không kết nối được — kiểm tra IP/port và nguồn IO-Box")
+        print("  [LOI] Khong ket noi duoc - kiem tra IP/port va nguon IO-Box")
         return
 
-    print(f"  ✅ Kết nối OK")
-    print(f"  → Đang bật coil {coil}...")
+    print(f"  [OK] Ket noi OK")
+    print(f"  -> Dang bat coil {coil}...")
     await client.write_coil(coil, True)
     await asyncio.sleep(0.5)
     r = await client.read_coils(coil, 1)
     state = r.bits[0] if not r.isError() else "ERR"
-    print(f"     Đọc lại coil {coil} = {state}")
+    print(f"     Doc lai coil {coil} = {state}")
     await asyncio.sleep(0.5)
     await client.write_coil(coil, False)
-    print(f"  → Đã tắt coil {coil}")
+    print(f"  -> Da tat coil {coil}")
     client.close()
     print(textwrap.dedent(f"""
-  Nếu thiết bị (băng tải / xy-lanh) hoạt động → đây là địa chỉ đúng.
-  Cập nhật .env:
-    IOBOX_COIL_BANG_TAI=<coil băng tải>
-    IOBOX_COIL_DAY_LOAI=<coil đẩy loại>
+  Neu thiet bi (bang tai / xy-lanh) hoat dong -> day la dia chi dung.
+  Cap nhat .env:
+    IOBOX_COIL_BANG_TAI=<coil bang tai>
+    IOBOX_COIL_DAY_LOAI=<coil day loai>
     """))
 
 
@@ -132,9 +139,9 @@ def run_iobox(host, port, coil):
     asyncio.run(_iobox_test(host, int(port), int(coil)))
 
 
-# ───────────────────────────────────────────────
-# 4. NETWORK PING — kiểm tra IP các thiết bị
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
+# 4. NETWORK PING - kiem tra IP cac thiet bi
+# ---------------------------------------------------------------
 def run_ping():
     import subprocess, platform
     targets = [
@@ -143,31 +150,32 @@ def run_ping():
         ("Laser",    "192.168.1.60"),
     ]
     flag = "-n" if platform.system() == "Windows" else "-c"
-    print("\n[Ping] Kiểm tra kết nối mạng...\n")
+    print("\n[Ping] Kiem tra ket noi mang...\n")
     for name, ip in targets:
         r = subprocess.run(["ping", flag, "1", "-w", "1000", ip],
                            capture_output=True, text=True)
         ok = r.returncode == 0
-        print(f"  {'✅' if ok else '❌'} {name:10s} {ip:16s}  {'OK' if ok else 'KHÔNG PHẢN HỒI'}")
-    print("\n  Nếu IP sai: đo lại từ tủ điện rồi sửa .env")
+        print(f"  {'[OK]' if ok else '[--]'} {name:10s} {ip:16s}  "
+              f"{'OK' if ok else 'KHONG PHAN HOI'}")
+    print("\n  Neu IP sai: do lai tu tu dien roi sua .env")
 
 
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
 # MENU
-# ───────────────────────────────────────────────
+# ---------------------------------------------------------------
 def menu():
     print(textwrap.dedent("""
-    ╔══════════════════════════════════════════╗
-    ║   SATORI v2 — Công cụ chẩn đoán thiết bị ║
-    ╚══════════════════════════════════════════╝
-    Chọn:
-      1) Ping tất cả thiết bị
-      2) Sniff Scanner  (xem raw bytes / mã chai)
-      3) Test Laser     (gửi lệnh in thử)
-      4) Test IO-Box    (bật/tắt một coil)
-      q) Thoát
+    ============================================
+       SATORI v2 - Cong cu chan doan thiet bi
+    ============================================
+    Chon:
+      1) Ping tat ca thiet bi
+      2) Sniff Scanner  (xem raw bytes / ma chai)
+      3) Test Laser     (gui lenh in thu)
+      4) Test IO-Box    (bat/tat mot coil)
+      q) Thoat
     """))
-    choice = input("Nhập lựa chọn: ").strip().lower()
+    choice = input("Nhap lua chon: ").strip().lower()
 
     if choice == "1":
         run_ping()
@@ -177,17 +185,17 @@ def menu():
     elif choice == "3":
         h = input("IP laser [192.168.1.60]: ").strip() or "192.168.1.60"
         p = input("Port laser [9100]: ").strip() or "9100"
-        t = input("Template lệnh [{code}\\r\\n]: ").strip() or None
+        t = input("Template lenh [{code}\\r\\n]: ").strip() or None
         run_laser(h, p, t)
     elif choice == "4":
         h = input("IP IO-Box [192.168.1.50]: ").strip() or "192.168.1.50"
         p = input("Port ModBus [502]: ").strip() or "502"
-        c = input("Coil số muốn test [0]: ").strip() or "0"
+        c = input("Coil so muon test [0]: ").strip() or "0"
         run_iobox(h, p, c)
     elif choice in ("q", ""):
         sys.exit(0)
     else:
-        print("Không hợp lệ.")
+        print("Khong hop le.")
 
 
 if __name__ == "__main__":

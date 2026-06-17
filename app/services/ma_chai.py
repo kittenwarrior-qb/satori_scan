@@ -1,5 +1,6 @@
 """Sinh & parse mã chai yyMMddCCCCC (11 số)."""
 from datetime import date
+from typing import Optional
 
 
 def generate_ma_chai(ngay_sx: date, counter: int) -> str:
@@ -7,7 +8,7 @@ def generate_ma_chai(ngay_sx: date, counter: int) -> str:
     return ngay_sx.strftime("%y%m%d") + str(counter).zfill(5)
 
 
-def parse_ma_chai(ma: str) -> dict | None:
+def parse_ma_chai(ma: str) -> Optional[dict]:
     """Parse mã 11 số. Trả None nếu không hợp lệ."""
     if not ma or len(ma) != 11 or not ma.isdigit():
         return None

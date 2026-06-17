@@ -1,4 +1,6 @@
 """Cấu hình toàn hệ thống, đọc từ .env (xem .env.example)."""
+from typing import List, Tuple
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -41,9 +43,9 @@ class Settings(BaseSettings):
     laser_cmd_template: str = "PRINT|{code}\r\n"
 
     @property
-    def scanner_list(self) -> list[tuple[str, int]]:
+    def scanner_list(self) -> List[Tuple[str, int]]:
         """Parse SCANNER_HOSTS thành danh sách (host, port)."""
-        result: list[tuple[str, int]] = []
+        result: List[Tuple[str, int]] = []
         for item in self.scanner_hosts.split(","):
             item = item.strip()
             if not item:

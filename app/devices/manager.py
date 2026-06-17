@@ -5,6 +5,7 @@ dùng chung 1 callback on_scan → backend xử lý đồng nhất.
 """
 import asyncio
 import logging
+from typing import List
 
 from app.config import settings
 from app.devices import iobox, laser, scanner
@@ -17,7 +18,7 @@ class DeviceManager:
         self.scanners: list = []   # danh sách scanner (1 hoặc nhiều)
         self.iobox = None
         self.laser = None
-        self._scanner_tasks: list[asyncio.Task] = []
+        self._scanner_tasks: List[asyncio.Task] = []
 
     def setup(self, on_scan):
         if settings.use_mock_devices:

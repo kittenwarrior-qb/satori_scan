@@ -1,11 +1,36 @@
+# Virtual environments
 venv/
+venv*/
+.venv/
+env/
+ENV/
+
+# Python cache
 __pycache__/
+*.py[cod]
 *.pyc
+.pytest_cache/
+
+# Environment / secrets
 .env
+.env.*
+
+# Data & backups
 data/*.db
 data/reports/*.xlsx
 data/backups/
+
+# Build artifacts
 dist/
 build/
 *.spec
-.pytest_cache/
+
+# Logs
+*.log
+
+# Local inspection / scratch files
+inspect_*.py
+inspect_*.txt
+scan_statuses.py
+status_scan_result.txt
+pip_log.txt

@@ -1,5 +1,6 @@
 """WebSocket manager — push kết quả quét realtime lên UI."""
 import logging
+from typing import List
 
 from fastapi import WebSocket
 
@@ -8,7 +9,7 @@ log = logging.getLogger("satori.ws")
 
 class WSManager:
     def __init__(self):
-        self.conns: list[WebSocket] = []
+        self.conns: List[WebSocket] = []
 
     async def connect(self, ws: WebSocket):
         await ws.accept()
