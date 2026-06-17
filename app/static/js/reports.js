@@ -68,6 +68,60 @@ document.getElementById("btn-export-batch").onclick = async () => {
     } catch (e) { toast(e.message, "err"); }
 };
 
+// ── Báo cáo theo ca / ngày ──
+const CHE_DO_LABEL = { DINH_DANH: "Định danh", PHAN_LOAI: "Phân loại", LOAI_BO: "Loại bỏ" };
+
+function _today() { return new Date().toISOString().slice(0, 10); }
+function _firstOfMonth() {
+    const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10);
+}
+document.getElementById("shift-from").value = _firstOfMonth();
+document.getElementById("shift-to").value = _today();
+
+function shiftQS() {
+    const f = document.getElementById("shift-from").value;
+    const t = document.getElementById("shift-to").value;
+    const m = document.getElementById("shift-mode").value;
+    const p = new URLSearchParams();
+    if (f) p.set("from_date", f);
+    if (t) p.set("to_date", t);
+    if (m) p.set("che_do", m);
+    return p.toString();
+}
+
+async function loadShifts() {
+    try {
+        const d = await api(`/api/reports/shifts?${shiftQS()}`);
+        document.getElementById("shift-total-ok").textContent = d.totals.tong_hop_le;
+        document.getElementById("shift-total-err").textContent = d.totals.tong_loi;
+        document.getElementById("shift-total-rate").textContent = d.totals.ty_le_loi;
+        document.getElementById("shift-rows").innerHTML = d.rows.length
+            ? d.rows.map(r => {
+                const rateCls = r.ty_le_loi >= 10 ? "err" : (r.ty_le_loi > 0 ? "warn" : "ok");
+                return `<div class="table-row shift-grid">
+                    <span>${r.ngay}</span>
+                    <span>${CHE_DO_LABEL[r.che_do] || r.che_do}</span>
+                    <span>${r.operator || "—"}</span>
+                    <span>${r.bat_dau}–${r.ket_thuc}</span>
+                    <span>${r.tong_hop_le}</span>
+                    <span>${r.tong_loi}</span>
+                    <span class="badge ${rateCls}">${r.ty_le_loi}%</span>
+                </div>`;
+            }).join("")
+            : `<div class="table-row" style="padding:16px;color:var(--muted)">Không có ca nào trong khoảng này</div>`;
+    } catch (e) { toast(e.message, "err"); }
+}
+loadShifts();
+document.getElementById("btn-shift").onclick = loadShifts;
+
+document.getElementById("btn-export-shift").onclick = async () => {
+    try {
+        const d = await api(`/api/reports/export/shifts?${shiftQS()}`, "POST");
+        toast(`Xuất xong: ${d.filename}`, "ok");
+        window.location = `/api/reports/download?filename=${encodeURIComponent(d.filename)}`;
+    } catch (e) { toast(e.message, "err"); }
+};
+
 document.getElementById("btn-backup").onclick = async () => {
     try {
         const d = await api("/api/reports/backup", "POST");

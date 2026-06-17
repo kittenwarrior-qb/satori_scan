@@ -1,5 +1,6 @@
 """API cho QUẢN LÝ & BÁO CÁO — tra cứu, truy vết, xuất Excel."""
 import os
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
@@ -10,6 +11,16 @@ from app.database.connection import get_db
 from app.services import report as report_svc
 
 router = APIRouter()
+
+
+def _parse_date(s: str | None):
+    """Parse 'YYYY-MM-DD' (từ ô <input type=date>). None nếu rỗng/sai."""
+    if not s:
+        return None
+    try:
+        return date.fromisoformat(s)
+    except ValueError:
+        return None
 
 
 @router.get("/reports/batches")
@@ -63,6 +74,22 @@ def search(q: str, field: str = "ma_chai", db: Session = Depends(get_db)):
             if bot.ngay_san_xuat else "",
         })
     return {"count": len(out), "rows": out}
+
+
+@router.get("/reports/shifts")
+def shifts(from_date: str | None = None, to_date: str | None = None,
+           che_do: str | None = None, db: Session = Depends(get_db)):
+    """Báo cáo theo ca/ngày trong khoảng thời gian."""
+    return report_svc.shift_summary(db, _parse_date(from_date),
+                                    _parse_date(to_date), che_do)
+
+
+@router.post("/reports/export/shifts")
+def export_shifts(from_date: str | None = None, to_date: str | None = None,
+                  che_do: str | None = None, db: Session = Depends(get_db)):
+    path = report_svc.export_shifts(db, _parse_date(from_date),
+                                    _parse_date(to_date), che_do)
+    return {"path": path, "filename": os.path.basename(path)}
 
 
 @router.get("/reports/trace")
