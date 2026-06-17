@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary       # driver PostgreSQL (prod)
+pydantic
+pydantic-settings
+pymodbus              # giao tiếp ModBus (IO-Box / PLC)
+openpyxl              # xuất Excel
+qrcode[pil]          # tạo mã QR
+passlib[bcrypt]      # mã hóa mật khẩu
+python-multipart
+jinja2               # template HTML
+websockets
+httpx                # cho simulator

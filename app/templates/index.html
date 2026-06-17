@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}SATORI v2 — Trang chủ{% endblock %}
+{% block header %}Trang chủ{% endblock %}
+{% block content %}
+<div class="home-wrap">
+
+  <div class="home-cards">
+    <a href="/identify" class="home-card">
+      <div class="hc-num">01</div>
+      <div class="hc-title">ĐỊNH DANH CHAI MỚI</div>
+      <div class="hc-desc">In mã laser cho chai trắng nhập từ nhà cung cấp</div>
+    </a>
+    <a href="/classify" class="home-card">
+      <div class="hc-num">02</div>
+      <div class="hc-title">PHÂN LOẠI CHAI</div>
+      <div class="hc-desc">Quét chai cũ — kiểm tra tái sử dụng — đẩy loại tự động</div>
+    </a>
+    <a href="/reports" class="home-card home-card-wide">
+      <div class="hc-num">03</div>
+      <div class="hc-title">QUẢN LÝ CHUNG VÀ BÁO CÁO</div>
+      <div class="hc-desc">Tra cứu — truy vết — xuất Excel</div>
+    </a>
+  </div>
+
+  <div class="home-devbox">
+    <div class="sbox-title">Trạng thái thiết bị</div>
+    <div id="device-bar"></div>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script>deviceBar("device-bar");</script>
+{% endblock %}

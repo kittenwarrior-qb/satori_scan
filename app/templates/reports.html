@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Quản lý & Báo cáo{% endblock %}
+{% block header %}QUẢN LÝ CHUNG VÀ BÁO CÁO{% endblock %}
+{% block content %}
+<div class="reports-page">
+
+    <div class="section-block">
+        <div class="section-head">
+            <h3>Báo cáo sản xuất</h3>
+            <button id="btn-export-prod" class="btn-print">&#8595; Xuất báo cáo tổng</button>
+        </div>
+        <div class="table-wrap">
+            <div class="table-head batch-grid">
+                <span>Lô SX</span><span>Ngày SX</span><span>SL chai</span>
+                <span>NCC: Lô</span><span>NCC: TSD</span><span>NCC: SL</span>
+            </div>
+            <div id="batch-rows" class="table-body short"></div>
+        </div>
+    </div>
+
+    <div class="section-block">
+        <div class="section-head">
+            <h3>Tìm kiếm</h3>
+        </div>
+        <div class="search-bar">
+            <select id="search-field">
+                <option value="lo_sx">Lô SX</option>
+                <option value="lo_ncc">Lô NCC</option>
+                <option value="ma_chai" selected>Mã chai</option>
+            </select>
+            <input id="search-q" placeholder="Nhập từ khoá...">
+            <button id="btn-search" class="btn-start" style="width:110px;flex-shrink:0;height:34px">Tìm kiếm</button>
+            <button id="btn-export-batch" class="btn-print" style="white-space:nowrap">&#8595; Xuất lô SX</button>
+        </div>
+        <div class="row-count" style="margin-bottom:8px">Kết quả: <b id="search-count">0</b></div>
+        <div class="table-wrap">
+            <div class="table-head result-grid">
+                <span>Lô SX</span><span>Lô NCC</span><span>Mã chai</span>
+                <span>TSD thực tế</span><span>Trạng thái</span><span>Ngày SX</span>
+            </div>
+            <div id="result-rows" class="table-body" style="max-height:320px"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/reports.js"></script>
+{% endblock %}

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>{% block title %}SATORI{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header class="topbar">
+        <a href="/" class="topbar-logo">
+            <img src="/static/img/satori_logo.png" class="logo-img" alt="SATORI"
+                 onerror="this.style.display='none';document.getElementById('logo-txt').style.display='block'">
+            <span id="logo-txt" class="logo-fallback">SATORI</span>
+        </a>
+        <div class="screen-title">{% block header %}{% endblock %}</div>
+        <div class="brand-info">
+            <span id="clock"></span>
+            <span class="ver">v2.0</span>
+        </div>
+    </header>
+    <main>{% block content %}{% endblock %}</main>
+
+    <div class="toast-wrap" id="toast-wrap"></div>
+
+    <script src="/static/js/app.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

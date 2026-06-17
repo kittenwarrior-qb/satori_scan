@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Phân loại chai{% endblock %}
+{% block header %}PHÂN LOẠI CHAI{% endblock %}
+{% block content %}
+<div class="screen">
+
+  <!-- ══ TOP: Thông tin chung ══ -->
+  <div class="info-block">
+    <div class="info-block-header">
+      <span>Thông tin chung</span>
+      <button class="btn-print" style="height:24px;padding:0 12px;font-size:11px"
+              onclick="openBatchModal(function(b){loadActiveInfo();})">Cập nhật lô SX</button>
+    </div>
+    <div class="info-fields" style="grid-template-columns:1fr 1fr">
+      <div class="info-field"><label>Số lô sản xuất:</label><span class="fval" id="lo-sx">—</span></div>
+      <div class="info-field"><label>Ngày sản xuất:</label><span class="fval" id="ngay-sx">—</span></div>
+    </div>
+  </div>
+
+  <!-- ══ CONTENT ══ -->
+  <div class="content-split">
+
+    <!-- LEFT: Danh sách sản phẩm -->
+    <div class="content-left">
+      <div class="tbl-label">Danh sách sản phẩm:</div>
+      <div class="table-frame" style="flex:1">
+        <div class="table-head classify-grid">
+          <span>#</span>
+          <span>Mã Sản Phẩm</span>
+          <span>Thời gian</span>
+          <span title="Số lần được phép tái sử dụng">Phép TSD</span>
+          <span title="Số lần đã tái sử dụng thực tế">Đã TSD</span>
+          <span>Trạng thái</span>
+        </div>
+        <div id="rows" class="table-body"></div>
+      </div>
+      <div class="row-count">RowsCount: <b id="count">0</b></div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="content-right">
+
+      <!-- Thông tin sản xuất -->
+      <div class="sbox">
+        <div class="sbox-title">Thông tin sản xuất</div>
+        <div class="sbox-body">
+          <div class="stat-row">
+            <span>Số chai hợp lệ:</span>
+            <span class="sval ok-val" id="stat-ok">0</span>
+          </div>
+          <div class="stat-row">
+            <span>Số chai bị lỗi:</span>
+            <span class="sval err-val" id="stat-err">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thiết bị -->
+      <div class="sbox">
+        <div id="device-bar"></div>
+      </div>
+
+      <!-- Kết quả quét gần nhất -->
+      <div class="sbox sbox-grow" style="display:flex;flex-direction:column">
+        <div class="sbox-title">Kết quả quét</div>
+        <div class="scan-big scan-idle" id="scan-result">
+          <div class="sb-icon">&#128269;</div>
+          <div class="sb-ma">Chờ quét...</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══ ACTION BAR ══ -->
+  <div class="action-bar">
+    <button id="btn-start" class="btn-act-ok">&#9654; Bắt đầu</button>
+    <button id="btn-end" class="btn-act-stop" disabled>&#9632; Kết thúc sản xuất</button>
+    <div id="session-status" class="session-pill session-idle">&#9679; Chưa bắt đầu</div>
+    <div class="spacer"></div>
+    <a href="/reject" class="btn-act-link">Loại bỏ thủ công</a>
+  </div>
+
+  <!-- Dev bar (ẩn khi dùng thiết bị thật) -->
+  <div class="dev-bar" id="dev-bar" style="display:none">
+    <span class="dev-label">Gia lap scanner</span>
+    <input id="test-ma" placeholder="Ma chai (vi du: 260616-00001)" style="max-width:200px">
+    <button id="btn-test" class="btn-dev-scan">Quet thu</button>
+    <button id="btn-auto" class="btn-dev-auto">Auto 20 chai</button>
+    <span class="dev-hint">Bam Bat dau truoc</span>
+  </div>
+
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/batch_modal.js"></script>
+<script src="/static/js/classify.js"></script>
+{% endblock %}

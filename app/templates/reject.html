@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Loại bỏ chai{% endblock %}
+{% block header %}PHÂN LOẠI CHAI — LOẠI BỎ{% endblock %}
+{% block content %}
+<div class="screen">
+    <div class="screen-body">
+
+        <!-- ═══ LEFT: Danh sách đã loại ═══ -->
+        <div class="table-panel">
+            <div class="table-panel-label">Danh sách sản phẩm bị loại:</div>
+            <div class="table-frame">
+                <div class="table-head reject-grid">
+                    <span>#</span>
+                    <span>Mã Chai</span>
+                    <span>Thời gian</span>
+                    <span>Trạng thái</span>
+                </div>
+                <div id="rows" class="table-body"></div>
+            </div>
+            <div class="row-count">RowsCount: <b id="count">0</b></div>
+        </div>
+
+        <!-- ═══ RIGHT: Nhập mã + Keypad ═══ -->
+        <div class="right-sidebar">
+
+            <!-- Nhập mã -->
+            <div class="cbox">
+                <div class="cbox-title">Nhập mã chai cần loại bỏ</div>
+                <div class="cbox-body">
+                    <div class="input-big">
+                        <input id="ma-input" placeholder="Quét hoặc nhập mã" autofocus>
+                        <button id="btn-ok" class="btn-start" style="width:56px;flex-shrink:0;height:34px">OK</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bàn phím số -->
+            <div class="cbox">
+                <div class="cbox-title">Bàn phím</div>
+                <div class="cbox-body">
+                    <div class="keypad">
+                        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+                        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+                        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+                        <button data-k="0" style="grid-column:span 2">0</button>
+                        <button data-k="back" class="k-fn">&#9003;</button>
+                        <button data-k="clear" class="k-fn" style="grid-column:span 3">Xóa tất cả</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Thiết bị -->
+            <div class="cbox">
+                <div class="cbox-title">Thiết bị</div>
+                <div class="cbox-body">
+                    <div class="devices" id="device-bar"></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ═══ BOTTOM: Action bar ═══ -->
+    <div class="action-bar">
+        <a href="/classify" class="btn-act-gray" style="display:inline-flex;align-items:center;height:40px;padding:0 18px;border:2px solid #888;color:#ccc;font-size:14px;font-weight:600">&#8592; Về phân loại</a>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/reject.js"></script>
+{% endblock %}
