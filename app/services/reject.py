@@ -3,7 +3,7 @@ import logging
 
 from sqlalchemy.orm import Session
 
-from app.database import crud
+from app.database import crud, models
 
 log = logging.getLogger("satori.reject")
 
@@ -24,7 +24,7 @@ def reject_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
                        session_id=session_id)
         return {"ket_qua": "REJECTED", "ma_chai": ma_chai, "already": True}
 
-    bottle.trang_thai = -1  # âm = đã loại
+    bottle.trang_thai = models.REJECT_MANUAL  # -3: loại thủ công (cảm quan)
     db.commit()
 
     crud.log_event(db, bottle_id=bottle.id, ma_chai=ma_chai,

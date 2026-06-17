@@ -7,7 +7,10 @@
     <div class="section-block">
         <div class="section-head">
             <h3>Báo cáo sản xuất</h3>
-            <button id="btn-export-prod" class="btn-print">&#8595; Xuất báo cáo tổng</button>
+            <div style="display:flex;gap:8px">
+                <button id="btn-edit-sup" class="btn-secondary">Cập nhật lô NCC</button>
+                <button id="btn-export-prod" class="btn-print">&#8595; Xuất báo cáo tổng</button>
+            </div>
         </div>
         <div class="table-wrap">
             <div class="table-head batch-grid">
@@ -32,7 +35,14 @@
             <button id="btn-search" class="btn-start" style="width:110px;flex-shrink:0;height:34px">Tìm kiếm</button>
             <button id="btn-export-batch" class="btn-print" style="white-space:nowrap">&#8595; Xuất lô SX</button>
         </div>
-        <div class="row-count" style="margin-bottom:8px">Kết quả: <b id="search-count">0</b></div>
+        <div class="row-count" style="margin-bottom:8px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span>Kết quả: <b id="search-count">0</b></span>
+            <span style="font-weight:400;color:var(--muted)">
+                Chú thích trạng thái: <b style="color:var(--ok)">số</b> = số lần đã dùng ·
+                <b style="color:var(--muted)">Mới</b> = chưa dùng ·
+                <b style="color:var(--err)">Đã loại</b> (Quá hạn TSD / Mã lỗi / Cảm quan)
+            </span>
+        </div>
         <div class="table-wrap">
             <div class="table-head result-grid">
                 <span>Lô SX</span><span>Lô NCC</span><span>Mã chai</span>
@@ -43,6 +53,60 @@
     </div>
 
 </div>
+
+<!-- Modal: cập nhật lô NCC (sửa số lần tái sử dụng cho cả lô đang lưu hành) -->
+<div id="sup-overlay" class="overlay hidden" onclick="if(event.target===this)closeSupModal()">
+  <div class="modal" style="min-width:420px;max-width:480px" onclick="event.stopPropagation()">
+    <div class="modal-header">Cập nhật lô nhà cung cấp</div>
+    <div class="modal-body">
+
+      <!-- Bước 1: mật khẩu -->
+      <div id="sup-step-pw">
+        <div class="modal-row">
+          <label>Mật khẩu quản lý</label>
+          <input type="password" id="sup-pw" placeholder="Nhập mật khẩu..." autocomplete="off">
+        </div>
+        <div class="modal-actions">
+          <button class="btn-confirm" onclick="supVerifyPw()">Xác nhận</button>
+          <button class="btn-cancel" onclick="closeSupModal()">Hủy</button>
+        </div>
+      </div>
+
+      <!-- Bước 2: form -->
+      <div id="sup-step-form" class="hidden">
+        <div class="modal-row">
+          <label>Chọn lô NCC</label>
+          <select id="sup-select"></select>
+        </div>
+        <div class="modal-row">
+          <label>Nhà cung cấp</label>
+          <input id="sup-ncc" placeholder="Ngọc Nghĩa">
+        </div>
+        <div class="modal-row">
+          <label>Số lô NCC</label>
+          <input id="sup-lo" placeholder="NN2001008Q1">
+        </div>
+        <div class="modal-row">
+          <label>Số lượng chai</label>
+          <input id="sup-sl" type="number" min="0">
+        </div>
+        <div class="modal-row">
+          <label>Số lần tái sử dụng cho phép</label>
+          <input id="sup-tsd" type="number" min="1" max="50">
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin:4px 0 8px">
+          Lưu ý: đổi “Số lần tái sử dụng” áp dụng ngay cho TẤT CẢ chai của lô này.
+        </p>
+        <div class="modal-actions">
+          <button class="btn-confirm" onclick="supSave()">Lưu</button>
+          <button class="btn-cancel" onclick="closeSupModal()">Hủy</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 {% block scripts %}
 <script src="/static/js/reports.js"></script>

@@ -56,6 +56,17 @@ async def test_ok_increments(db):
 async def test_over_limit(db):
     r = await classify_svc.classify_bottle(db, "20010800002", 1)
     assert r["ket_qua"] == "OVER_LIMIT"
+    # Chai quá hạn được đánh dấu trạng thái âm = -1 (quá hạn TSD)
+    b = classify_svc.crud.get_bottle_by_ma(db, "20010800002")
+    assert b.trang_thai == -1
+
+
+def test_reject_manual_marks_minus3(db):
+    from app.services import reject as reject_svc
+    r = reject_svc.reject_bottle(db, "20010800001", 1)
+    assert r["ket_qua"] == "REJECTED"
+    b = classify_svc.crud.get_bottle_by_ma(db, "20010800001")
+    assert b.trang_thai == -3   # -3 = loại thủ công (cảm quan)
 
 
 @pytest.mark.asyncio

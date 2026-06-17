@@ -77,9 +77,11 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
             "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
         }
 
-    # 3d. Vượt giới hạn → loại
+    # 3d. Vượt giới hạn → loại + đánh dấu trạng thái âm (lý do: quá hạn TSD)
     if bottle.so_lan_thuc_te >= gioi_han:
         await device_manager.iobox.day_loai_chai()
+        bottle.trang_thai = models.REJECT_OVER_LIMIT
+        db.commit()
         _log(db, bottle.id, ma_chai, "OVER_LIMIT", session_id)
         crud.bump_session(db, session_id, ok=False)
         return {
