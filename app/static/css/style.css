@@ -420,6 +420,7 @@ main {
 .reject-grid   { grid-template-columns: 36px 2fr 1.2fr 1.3fr; }
 .batch-grid    { grid-template-columns: 1.4fr 1fr .8fr 1.4fr .8fr .8fr; }
 .result-grid   { grid-template-columns: 1.2fr 1.2fr 1.5fr 1fr 1fr 1fr; }
+.shift-grid    { grid-template-columns: 1.1fr 1fr 1.3fr 1fr .8fr .8fr 1fr; }
 
 .table-head {
   background: var(--blue);       /* #166C94 */

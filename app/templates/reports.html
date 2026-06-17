@@ -24,6 +24,40 @@
 
     <div class="section-block">
         <div class="section-head">
+            <h3>Báo cáo theo ca / ngày</h3>
+            <button id="btn-export-shift" class="btn-print">&#8595; Xuất báo cáo ca</button>
+        </div>
+        <div class="search-bar">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                Từ <input id="shift-from" type="date" style="width:150px">
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                Đến <input id="shift-to" type="date" style="width:150px">
+            </label>
+            <select id="shift-mode" style="width:140px;flex-shrink:0">
+                <option value="">Tất cả chế độ</option>
+                <option value="PHAN_LOAI">Phân loại</option>
+                <option value="DINH_DANH">Định danh</option>
+                <option value="LOAI_BO">Loại bỏ</option>
+            </select>
+            <button id="btn-shift" class="btn-start" style="width:110px;flex-shrink:0;height:34px">Xem</button>
+        </div>
+        <div class="row-count" style="margin-bottom:8px">
+            Tổng: <b id="shift-total-ok" style="color:var(--ok)">0</b> hợp lệ ·
+            <b id="shift-total-err" style="color:var(--err)">0</b> lỗi ·
+            tỉ lệ lỗi <b id="shift-total-rate">0</b>%
+        </div>
+        <div class="table-wrap">
+            <div class="table-head shift-grid">
+                <span>Ngày</span><span>Ca</span><span>Trưởng ca</span>
+                <span>Giờ</span><span>Hợp lệ</span><span>Lỗi</span><span>Tỉ lệ lỗi</span>
+            </div>
+            <div id="shift-rows" class="table-body" style="max-height:240px"></div>
+        </div>
+    </div>
+
+    <div class="section-block">
+        <div class="section-head">
             <h3>Tìm kiếm</h3>
         </div>
         <div class="search-bar">
