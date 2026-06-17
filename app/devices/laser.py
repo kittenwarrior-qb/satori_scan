@@ -16,16 +16,33 @@ class RealLaser(BaseLaser):
         self._cmd_template = settings.laser_cmd_template
 
     async def connect(self):
-        self._connected = True
-        log.info("RealLaser ready %s:%s  template=%r", self.host, self.port, self._cmd_template)
+        # Thử kết nối thật để biết laser có online không (không còn "ảo OK").
+        self._connected = await self._probe()
+        log.info("RealLaser %s:%s connected=%s template=%r",
+                 self.host, self.port, self._connected, self._cmd_template)
+
+    async def _probe(self) -> bool:
+        try:
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(self.host, self.port), timeout=2)
+            writer.close()
+            return True
+        except Exception:
+            return False
 
     async def print_code(self, ma_chai: str):
         cmd = self._cmd_template.format(code=ma_chai).encode()
-        reader, writer = await asyncio.open_connection(self.host, self.port)
-        writer.write(cmd)
-        await writer.drain()
-        writer.close()
-        log.info("Laser print → %r", cmd)
+        try:
+            reader, writer = await asyncio.open_connection(self.host, self.port)
+            writer.write(cmd)
+            await writer.drain()
+            writer.close()
+            self._connected = True
+            log.info("Laser print → %r", cmd)
+        except Exception:
+            # In thất bại → laser coi như mất kết nối (UI phản ánh ngay).
+            self._connected = False
+            raise
 
     async def is_connected(self) -> bool:
         return self._connected

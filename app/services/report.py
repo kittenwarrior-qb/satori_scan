@@ -28,7 +28,10 @@ def export_production_report(db: Session) -> str:
     ws = wb.active
     ws.title = "Báo cáo sản xuất"
 
-    headers = ["Lô SX", "Ngày SX", "SL chai", "NCC: Lô", "NCC: TSD", "NCC: SL"]
+    # Cột khớp đúng báo cáo CodeIT (Figure 10 trong User Manual):
+    # Số lô sản xuất | Số lô nhà cung cấp | Số lượng chai | Ngày sản xuất
+    headers = ["Số lô sản xuất", "Số lô nhà cung cấp", "Số lượng chai",
+               "Ngày sản xuất"]
     ws.append(headers)
     _style_header(ws, len(headers))
 
@@ -39,11 +42,9 @@ def export_production_report(db: Session) -> str:
               .filter(models.Bottle.production_batch_id == b.id).count())
         ws.append([
             b.so_lo_san_xuat,
-            b.ngay_san_xuat.strftime("%d/%m/%Y") if b.ngay_san_xuat else "",
-            sl,
             sup.so_lo_ncc if sup else "",
-            sup.so_lan_tai_su_dung if sup else "",
-            sup.so_luong_chai if sup else "",
+            sl,
+            b.ngay_san_xuat.strftime("%d/%m/%Y") if b.ngay_san_xuat else "",
         ])
 
     for col in ws.columns:
@@ -67,8 +68,10 @@ def export_batch_detail(db: Session, so_lo_san_xuat: str) -> str | None:
     ws = wb.active
     ws.title = so_lo_san_xuat[:31]
 
-    headers = ["Lô SX", "Lô NCC", "Mã chai", "TSD thực tế",
-               "Trạng thái", "Ngày SX"]
+    # Cột khớp đúng báo cáo chi tiết CodeIT (Figure 11 trong User Manual):
+    # Số lô SX | Ngày SX | Số lô NCC | Mã số chai | Trạng thái chai | Số lần TSD
+    headers = ["Số lô sản xuất", "Ngày sản xuất", "Số lô nhà cung cấp",
+               "Mã số chai", "Trạng thái chai", "Số lần tái sử dụng"]
     ws.append(headers)
     _style_header(ws, len(headers))
 
@@ -78,11 +81,11 @@ def export_batch_detail(db: Session, so_lo_san_xuat: str) -> str | None:
                 .order_by(models.Bottle.id).all()):
         ws.append([
             batch.so_lo_san_xuat,
+            bot.ngay_san_xuat.strftime("%d/%m/%Y") if bot.ngay_san_xuat else "",
             sup.so_lo_ncc if sup else "",
             bot.ma_chai,
-            bot.so_lan_thuc_te,
             bot.trang_thai,
-            bot.ngay_san_xuat.strftime("%d/%m/%Y") if bot.ngay_san_xuat else "",
+            bot.so_lan_thuc_te,
         ])
 
     for col in ws.columns:

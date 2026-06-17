@@ -10,10 +10,11 @@ api("/api/is-mock").then(d => {
 
 const STATUS = {
     OK:         { label: "Hợp lệ",           cls: "ok",   icon: "✅" },
-    NOREAD:     { label: "NoRead",           cls: "err",  icon: "❌" },
+    NOREAD:     { label: "Không đọc được",    cls: "err",  icon: "❌" },
     UNKNOWN:    { label: "Mã không tồn tại",  cls: "err",  icon: "❌" },
     OVER_LIMIT: { label: "Vượt giới hạn",     cls: "warn", icon: "⚠️" },
     REJECTED:   { label: "Đã loại trước đó",  cls: "err",  icon: "❌" },
+    DUPLICATE:  { label: "QUÉT TRÙNG",        cls: "err",  icon: "🔁" },
 };
 
 deviceBar("device-bar");
@@ -37,8 +38,21 @@ loadActiveInfo();
 
 // WebSocket nhận kết quả quét realtime
 connectWS(d => {
+    if (d.event === "error") { toast(d.message || "Lỗi xử lý quét", "err"); return; }
     if (d.event !== "scan") return;
     const st = STATUS[d.ket_qua] || STATUS.NOREAD;
+
+    // Quét trùng: BÁO ĐỎ nhưng KHÔNG đếm, KHÔNG thêm dòng (cùng 1 chai).
+    if (d.ket_qua === "DUPLICATE") {
+        toast(`⚠ Quét trùng — bỏ qua: ${d.ma_chai}`, "err", 4000);
+        const p = document.getElementById("scan-result");
+        p.className = "scan-big scan-err";
+        p.innerHTML = `<div class="sb-icon">${st.icon}</div>
+            <div class="sb-ma">${d.ma_chai || "—"}</div>
+            <span class="sb-badge badge err">${st.label}</span>`;
+        return;
+    }
+
     count++;
     if (d.ket_qua === "OK") ok++; else err++;
 

@@ -44,8 +44,8 @@ async function deviceBar(elId) {
         const on = status === "OK";
         return `<tr class="${on ? 'dv-ok' : 'dv-err'}">
             <td>${name}</td>
-            <td>${on ? "Connected" : "Connecting"}</td>
-            <td>${on ? "OK" : "Connecting"}</td>
+            <td>${on ? "Đã kết nối" : "Mất kết nối"}</td>
+            <td>${on ? "Sẵn sàng" : "—"}</td>
         </tr>`;
     }
     refresh();

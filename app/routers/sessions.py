@@ -21,7 +21,12 @@ async def start(che_do: str, production_batch_id: int,
     s = crud.start_session(db, che_do, production_batch_id, operator)
     # Bật băng tải khi bắt đầu ca PHÂN LOẠI
     if che_do == "PHAN_LOAI":
-        await device_manager.iobox.start_bang_tai()
+        try:
+            await device_manager.iobox.start_bang_tai()
+        except Exception as e:
+            # Băng tải không bật được → đừng để ca "treo" trong DB.
+            crud.end_session(db, s)
+            raise HTTPException(503, f"Không bật được băng tải: {e}")
     return {"id": s.id, "che_do": s.che_do,
             "production_batch_id": s.production_batch_id}
 

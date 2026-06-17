@@ -42,6 +42,7 @@ def db():
 @pytest.fixture(autouse=True)
 def fake_iobox():
     device_manager.iobox = MockIOBox()
+    classify_svc._last_seen.clear()   # reset chống-quét-trùng giữa các test
 
 
 @pytest.mark.asyncio
@@ -55,6 +56,17 @@ async def test_ok_increments(db):
 async def test_over_limit(db):
     r = await classify_svc.classify_bottle(db, "20010800002", 1)
     assert r["ket_qua"] == "OVER_LIMIT"
+    # Chai quá hạn được đánh dấu trạng thái âm = -1 (quá hạn TSD)
+    b = classify_svc.crud.get_bottle_by_ma(db, "20010800002")
+    assert b.trang_thai == -1
+
+
+def test_reject_manual_marks_minus3(db):
+    from app.services import reject as reject_svc
+    r = reject_svc.reject_bottle(db, "20010800001", 1)
+    assert r["ket_qua"] == "REJECTED"
+    b = classify_svc.crud.get_bottle_by_ma(db, "20010800001")
+    assert b.trang_thai == -3   # -3 = loại thủ công (cảm quan)
 
 
 @pytest.mark.asyncio
@@ -73,3 +85,18 @@ async def test_noread(db):
 async def test_bad_format(db):
     r = await classify_svc.classify_bottle(db, "12", 1)
     assert r["ket_qua"] == "NOREAD"
+
+
+@pytest.mark.asyncio
+async def test_quet_trung_khong_tang_dem(db):
+    """Quét cùng 1 mã 2 lần liên tiếp: lần 2 là DUPLICATE, TSD không tăng tiếp."""
+    r1 = await classify_svc.classify_bottle(db, "20010800001", 1)
+    assert r1["ket_qua"] == "OK"
+    assert r1["so_lan_thuc_te"] == 1
+
+    r2 = await classify_svc.classify_bottle(db, "20010800001", 1)
+    assert r2["ket_qua"] == "DUPLICATE"
+
+    # TSD thực tế vẫn = 1 (không bị cộng nhầm thành 2)
+    bottle = classify_svc.crud.get_bottle_by_ma(db, "20010800001")
+    assert bottle.so_lan_thuc_te == 1

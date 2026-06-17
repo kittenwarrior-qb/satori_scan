@@ -42,6 +42,7 @@ loadBatches().catch(e => toast(e.message, "err"));
 
 // Nhận sự kiện in qua WS
 connectWS(d => {
+    if (d.event === "error") { toast(d.message || "Lỗi xử lý", "err"); return; }
     if (d.event !== "print") return;
     count++; ok++;
     const row = document.createElement("div");

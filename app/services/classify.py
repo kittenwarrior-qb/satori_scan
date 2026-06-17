@@ -1,13 +1,31 @@
 """Logic PHÂN LOẠI chai — trái tim hệ thống. Quyết định OK hay loại."""
 import logging
+import time
 
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import crud, models
 from app.devices.manager import device_manager
 from app.services.ma_chai import parse_ma_chai
 
 log = logging.getLogger("satori.classify")
+
+# Thời điểm quét gần nhất theo từng mã (chống quét trùng). Vì on_scan chạy dưới
+# 1 asyncio.Lock chung nên truy cập dict này không có tranh chấp.
+_last_seen: dict[str, float] = {}
+
+
+def _seen_recently(ma_chai: str, window: float) -> bool:
+    """True nếu mã vừa được quét trong vòng `window` giây (= quét trùng)."""
+    now = time.monotonic()
+    last = _last_seen.get(ma_chai)
+    _last_seen[ma_chai] = now
+    if len(_last_seen) > 10000:                      # dọn bộ nhớ định kỳ
+        cutoff = now - max(window, 1.0)
+        for k in [k for k, t in _last_seen.items() if t < cutoff]:
+            del _last_seen[k]
+    return last is not None and (now - last) < window
 
 
 async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
@@ -25,6 +43,15 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
         _log(db, None, ma_chai, "NOREAD", session_id)
         crud.bump_session(db, session_id, ok=False)
         return {"ket_qua": "NOREAD", "ma_chai": ma_chai}
+
+    # 2b. Chống quét trùng — cùng 1 chai bị kích quét 2 lần liên tiếp (nhiễu băng
+    #     tải / cảm biến / quét tay lặp). KHÔNG đẩy loại, KHÔNG tăng đếm tái sử
+    #     dụng, KHÔNG cộng thống kê → tránh đếm sai số chai và tăng nhầm TSD.
+    if settings.classify_debounce_sec > 0 and \
+            _seen_recently(ma_chai, settings.classify_debounce_sec):
+        log.info("Quét trùng '%s' trong %.1fs — bỏ qua.",
+                 ma_chai, settings.classify_debounce_sec)
+        return {"ket_qua": "DUPLICATE", "ma_chai": ma_chai}
 
     # 3. Tra DB
     bottle = crud.get_bottle_by_ma(db, ma_chai)
@@ -50,9 +77,11 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
             "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
         }
 
-    # 3d. Vượt giới hạn → loại
+    # 3d. Vượt giới hạn → loại + đánh dấu trạng thái âm (lý do: quá hạn TSD)
     if bottle.so_lan_thuc_te >= gioi_han:
         await device_manager.iobox.day_loai_chai()
+        bottle.trang_thai = models.REJECT_OVER_LIMIT
+        db.commit()
         _log(db, bottle.id, ma_chai, "OVER_LIMIT", session_id)
         crud.bump_session(db, session_id, ok=False)
         return {

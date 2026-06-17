@@ -7,6 +7,21 @@ from sqlalchemy.orm import relationship
 from app.database.connection import Base
 
 
+# ── Mã trạng thái chai khi BỊ LOẠI (trang_thai < 0) ──────────────────────────
+# trang_thai >= 0 : số lần đã tái sử dụng (0 = chai mới).
+# trang_thai <  0 : đã loại — giá trị âm cho biết LÝ DO (giống cách CodeIT
+#                   dùng trạng thái âm). Có chú thích trên màn Báo cáo cho NV.
+REJECT_OVER_LIMIT = -1   # loại tự động: quá số lần tái sử dụng cho phép
+REJECT_BAD_CODE   = -2   # loại tự động: mã không đọc được / không hợp lệ
+REJECT_MANUAL     = -3   # loại thủ công: không đạt cảm quan (trầy, móp, nứt)
+
+REJECT_REASONS = {
+    REJECT_OVER_LIMIT: "Quá hạn tái sử dụng",
+    REJECT_BAD_CODE:   "Mã lỗi/không đọc được",
+    REJECT_MANUAL:     "Không đạt cảm quan",
+}
+
+
 class SupplierBatch(Base):
     """Lô nhà cung cấp (mặc định Ngọc Nghĩa)."""
     __tablename__ = "supplier_batches"

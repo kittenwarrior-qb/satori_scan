@@ -4,6 +4,7 @@ __pycache__/
 .env
 data/*.db
 data/reports/*.xlsx
+data/backups/
 dist/
 build/
 *.spec
