@@ -1,6 +1,7 @@
 """Hàm thêm/sửa/đọc dữ liệu dùng chung."""
 from datetime import datetime, date as date_type
 
+from sqlalchemy import update as sa_update
 from sqlalchemy.orm import Session
 
 from app.database import models
@@ -151,13 +152,13 @@ def end_session(db: Session, session: models.Session):
 
 
 def bump_session(db: Session, session_id: int, ok: bool):
-    s = db.get(models.Session, session_id)
-    if not s:
-        return
-    if ok:
-        s.tong_hop_le += 1
-    else:
-        s.tong_loi += 1
+    # Atomic SQL update — tránh lost-update khi 2 luồng đọc-ghi đồng thời.
+    col = models.Session.tong_hop_le if ok else models.Session.tong_loi
+    db.execute(
+        sa_update(models.Session)
+        .where(models.Session.id == session_id)
+        .values({col.key: col + 1})
+    )
     db.commit()
 
 

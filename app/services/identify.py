@@ -2,6 +2,7 @@
 import logging
 from datetime import date
 
+from sqlalchemy import update as sa_update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -60,12 +61,26 @@ async def identify_new_bottle(db: Session, production_batch_id: int,
         log.error("Không sinh được mã duy nhất cho lô %s", batch.so_lo_san_xuat)
         return {"ket_qua": "ERROR", "message": "Không sinh được mã duy nhất"}
 
-    # 2. Bộ đếm lô = số chai đã in trong lô này (chỉ để hiển thị).
-    batch.counter += 1
+    # 2. Bộ đếm lô — atomic để tránh lost-update khi in tay + scanner đồng thời.
+    db.execute(
+        sa_update(models.ProductionBatch)
+        .where(models.ProductionBatch.id == batch.id)
+        .values(counter=models.ProductionBatch.counter + 1)
+    )
     db.commit()
+    db.refresh(batch)
 
     # 3. In laser SAU khi đã giữ chỗ mã → mã in ra chắc chắn có trong DB.
-    await device_manager.laser.print_code(ma_chai)
+    try:
+        await device_manager.laser.print_code(ma_chai)
+    except Exception as laser_err:
+        log.error("Laser thất bại khi in '%s': %s", ma_chai, laser_err)
+        crud.log_event(db, bottle_id=bottle.id, ma_chai=ma_chai,
+                       event_type="PRINT", ket_qua="FAILED", session_id=session_id)
+        return {
+            "ket_qua": "PRINT_FAILED", "ma_chai": ma_chai,
+            "message": "Máy laser lỗi — cần in lại mã này",
+        }
 
     # 4. Log + thống kê
     crud.log_event(db, bottle_id=bottle.id, ma_chai=ma_chai,

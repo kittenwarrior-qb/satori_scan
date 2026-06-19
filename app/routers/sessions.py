@@ -1,10 +1,14 @@
 """API quản lý ca/phiên sản xuất + trạng thái thiết bị."""
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import crud
 from app.database.connection import get_db
 from app.devices.manager import device_manager
+from app.services.classify import reset_debounce
 
 router = APIRouter()
 
@@ -19,6 +23,7 @@ async def start(che_do: str, production_batch_id: int,
     if crud.get_active_session(db, che_do):
         raise HTTPException(400, "Đã có ca đang chạy")
     s = crud.start_session(db, che_do, production_batch_id, operator)
+    reset_debounce()
     # Bật băng tải khi bắt đầu ca PHÂN LOẠI
     if che_do == "PHAN_LOAI":
         try:
@@ -54,6 +59,19 @@ def active(che_do: str | None = None, db: Session = Depends(get_db)):
         "production_batch_id": s.production_batch_id,
         "tong_hop_le": s.tong_hop_le, "tong_loi": s.tong_loi,
     }
+
+
+@router.post("/sessions/recover")
+async def recover_sessions(password: str, db: Session = Depends(get_db)):
+    """Đóng mọi session bị treo (dùng sau crash / mất điện). Cần mật khẩu admin."""
+    if password != settings.admin_password:
+        raise HTTPException(403, "Mật khẩu không đúng")
+    q = db.query(crud.models.Session).filter(crud.models.Session.ket_thuc.is_(None))
+    stuck = q.all()
+    for s in stuck:
+        s.ket_thuc = datetime.now()
+    db.commit()
+    return {"closed": len(stuck)}
 
 
 @router.get("/devices/status")

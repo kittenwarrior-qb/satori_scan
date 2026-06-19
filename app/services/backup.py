@@ -76,7 +76,8 @@ async def backup_loop() -> None:
     interval = max(0.1, settings.backup_interval_hours) * 3600
     while True:
         try:
-            backup_now()
+            # Chạy trong thread riêng — tránh block event loop khi copy file lớn.
+            await asyncio.to_thread(backup_now)
         except Exception:
             log.exception("Lỗi sao lưu DB")
         await asyncio.sleep(interval)

@@ -14,9 +14,13 @@ router = APIRouter()
 
 # ── Xác thực mật khẩu ──────────────────────────────────────────────────────
 
+class _PwIn(BaseModel):
+    password: str
+
+
 @router.post("/verify-password")
-def verify_password(password: str):
-    if password != settings.admin_password:
+def verify_password(body: _PwIn):
+    if body.password != settings.admin_password:
         raise HTTPException(403, "Mật khẩu không đúng")
     return {"ok": True}
 

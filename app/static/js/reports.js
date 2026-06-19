@@ -144,8 +144,15 @@ document.getElementById("btn-edit-sup").onclick = () => {
 
 window.supVerifyPw = async () => {
     const pw = document.getElementById("sup-pw").value;
+    const btn = document.querySelector("#sup-step-pw .btn-confirm");
+    if (btn) { btn.disabled = true; btn.textContent = "Đang kiểm tra..."; }
     try {
-        await api(`/api/verify-password?password=${encodeURIComponent(pw)}`, "POST");
+        const r = await fetch("/api/verify-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: pw }),
+        });
+        if (!r.ok) throw new Error("wrong");
         _suppliers = await api("/api/batches/supplier");
         if (!_suppliers.length) { toast("Chưa có lô NCC nào", "err"); return; }
         const sel = document.getElementById("sup-select");
@@ -158,6 +165,8 @@ window.supVerifyPw = async () => {
     } catch {
         toast("Mật khẩu không đúng", "err");
         document.getElementById("sup-pw").value = "";
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Xác nhận"; }
     }
 };
 

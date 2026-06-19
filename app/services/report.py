@@ -111,7 +111,8 @@ def export_shifts(db: Session, from_date=None, to_date=None,
         ])
     for col in ws.columns:
         ws.column_dimensions[col[0].column_letter].width = 13
-    path = os.path.join(REPORT_DIR, "ShiftReport.xlsx")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(REPORT_DIR, f"ShiftReport_{stamp}.xlsx")
     wb.save(path)
     return path
 
@@ -145,7 +146,8 @@ def export_production_report(db: Session) -> str:
     for col in ws.columns:
         ws.column_dimensions[col[0].column_letter].width = 16
 
-    path = os.path.join(REPORT_DIR, "ProductionReport.xlsx")
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    path = os.path.join(REPORT_DIR, f"ProductionReport_{stamp}.xlsx")
     wb.save(path)
     return path
 

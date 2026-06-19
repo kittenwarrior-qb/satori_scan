@@ -1,6 +1,6 @@
 // ── Màn hình PHÂN LOẠI ──
 let count = 0, ok = 0, err = 0;
-let activeBatchId = 1;
+let activeBatchId = null;
 
 // Hiện dev-bar nếu đang mock
 api("/api/is-mock").then(d => {
@@ -19,16 +19,37 @@ const STATUS = {
 
 deviceBar("device-bar");
 
-// Tải thông tin lô SX đang chạy
+// Đồng bộ counter từ server sau khi WS kết nối lại
+async function syncCounters() {
+    try {
+        const sess = await api("/api/sessions/active?che_do=PHAN_LOAI");
+        if (sess.active) {
+            ok    = sess.tong_hop_le;
+            err   = sess.tong_loi;
+            count = ok + err;
+            document.getElementById("count").textContent    = count;
+            document.getElementById("stat-ok").textContent  = ok;
+            document.getElementById("stat-err").textContent = err;
+        }
+    } catch {}
+}
+
+// Tải thông tin lô SX + đồng bộ counter
 async function loadActiveInfo() {
     try {
         const sess = await api("/api/sessions/active?che_do=PHAN_LOAI");
         if (sess.active) {
             activeBatchId = sess.production_batch_id;
+            ok    = sess.tong_hop_le;
+            err   = sess.tong_loi;
+            count = ok + err;
+            document.getElementById("count").textContent    = count;
+            document.getElementById("stat-ok").textContent  = ok;
+            document.getElementById("stat-err").textContent = err;
             const batches = await api("/api/identify/batches");
             const b = batches.find(x => x.id === activeBatchId);
             if (b) {
-                document.getElementById("lo-sx").textContent = b.so_lo_san_xuat;
+                document.getElementById("lo-sx").textContent  = b.so_lo_san_xuat;
                 document.getElementById("ngay-sx").textContent = b.ngay_san_xuat;
             }
         }
@@ -36,13 +57,23 @@ async function loadActiveInfo() {
 }
 loadActiveInfo();
 
-// WebSocket nhận kết quả quét realtime
-connectWS(d => {
-    if (d.event === "error") { toast(d.message || "Lỗi xử lý quét", "err"); return; }
+// WebSocket — đồng bộ counter khi kết nối lại (onOpen)
+connectWS(wsHandler, syncCounters);
+
+function wsHandler(d) {
+    if (d.event === "iobox_fault") {
+        toast(`⚠ IO-Box lỗi — chai có thể không bị đẩy ra! ${d.message || ""}`, "err", 15000);
+        return;
+    }
+    if (d.event === "error") {
+        toast(d.message || "Lỗi xử lý quét", "err", 8000);
+        return;
+    }
     if (d.event !== "scan") return;
+
     const st = STATUS[d.ket_qua] || STATUS.NOREAD;
 
-    // Quét trùng: BÁO ĐỎ nhưng KHÔNG đếm, KHÔNG thêm dòng (cùng 1 chai).
+    // Quét trùng: BÁO ĐỎ nhưng KHÔNG đếm, KHÔNG thêm dòng
     if (d.ket_qua === "DUPLICATE") {
         toast(`⚠ Quét trùng — bỏ qua: ${d.ma_chai}`, "err", 4000);
         const p = document.getElementById("scan-result");
@@ -67,8 +98,8 @@ connectWS(d => {
         <span class="badge ${st.cls}">${st.label}</span>`;
     document.getElementById("rows").prepend(row);
 
-    document.getElementById("count").textContent = count;
-    document.getElementById("stat-ok").textContent = ok;
+    document.getElementById("count").textContent    = count;
+    document.getElementById("stat-ok").textContent  = ok;
     document.getElementById("stat-err").textContent = err;
 
     const panel = document.getElementById("scan-result");
@@ -78,48 +109,93 @@ connectWS(d => {
         <div class="sb-icon">${st.icon}</div>
         <div class="sb-ma">${d.ma_chai || "—"}</div>
         <span class="sb-badge badge ${st.cls}">${st.label}</span>`;
-});
+}
 
 function setSessionState(running) {
-    const pill = document.getElementById("session-status");
+    const pill     = document.getElementById("session-status");
     const btnStart = document.getElementById("btn-start");
     const btnEnd   = document.getElementById("btn-end");
     if (running) {
-        pill.textContent = "⬤ Ca đang chạy";
-        pill.className   = "session-pill session-running";
+        pill.textContent  = "⬤ Ca đang chạy";
+        pill.className    = "session-pill session-running";
         btnStart.disabled = true;
         btnEnd.disabled   = false;
     } else {
-        pill.textContent = "⬤ Chưa bắt đầu";
-        pill.className   = "session-pill session-idle";
+        pill.textContent  = "⬤ Chưa bắt đầu";
+        pill.className    = "session-pill session-idle";
         btnStart.disabled = false;
         btnEnd.disabled   = true;
     }
 }
 
-// Kiểm tra ca hiện tại khi load trang
-api("/api/sessions/active?che_do=PHAN_LOAI").then(d => setSessionState(d.active)).catch(() => {});
+// Kiểm tra ca khi load trang
+api("/api/sessions/active?che_do=PHAN_LOAI")
+    .then(d => setSessionState(d.active)).catch(() => {});
 
-// Bắt đầu ca
+// Bắt đầu ca — disable ngay trước await để tránh double-click
 document.getElementById("btn-start").onclick = async () => {
+    const btn = document.getElementById("btn-start");
+    btn.disabled = true;
     try {
+        if (!activeBatchId) {
+            toast("Chưa chọn lô sản xuất — nhấn 'Cập nhật lô SX' trước", "err");
+            btn.disabled = false;
+            return;
+        }
         await api("/api/sessions/start", "POST", {
-            che_do: "PHAN_LOAI", production_batch_id: activeBatchId
+            che_do: "PHAN_LOAI", production_batch_id: activeBatchId,
         });
         setSessionState(true);
         toast("Đã bắt đầu ca phân loại", "ok");
         loadActiveInfo();
-    } catch (e) { toast(e.message, "err"); }
+    } catch (e) {
+        if (e.message && e.message.includes("ca đang chạy")) {
+            toast("⚠ Có ca đang bị treo từ trước. Liên hệ quản lý để Phục hồi ca.", "err", 10000);
+        } else {
+            toast(e.message, "err");
+        }
+        btn.disabled = false;
+    }
 };
 
-// Kết thúc ca
+// Kết thúc ca — hiển thị modal tổng kết thay vì toast
 document.getElementById("btn-end").onclick = async () => {
+    const btn = document.getElementById("btn-end");
+    btn.disabled = true;
     try {
         const d = await api("/api/sessions/end", "POST", { che_do: "PHAN_LOAI" });
         setSessionState(false);
-        toast(`Kết thúc ca — Hợp lệ: ${d.tong_hop_le}, Lỗi: ${d.tong_loi}`, "info", 5000);
-    } catch (e) { toast(e.message, "err"); }
+        count = ok = err = 0;
+        _showShiftEndModal(d.tong_hop_le, d.tong_loi);
+    } catch (e) {
+        btn.disabled = false;
+        toast(e.message, "err");
+    }
 };
+
+function _showShiftEndModal(hopLe, loi) {
+    const tong = hopLe + loi;
+    const rate = tong ? ((loi / tong) * 100).toFixed(1) : "0.0";
+    const overlay = document.createElement("div");
+    overlay.className = "overlay";
+    overlay.style.zIndex = "5000";
+    overlay.innerHTML = `
+      <div class="modal" style="min-width:300px;max-width:380px;text-align:center"
+           onclick="event.stopPropagation()">
+        <div class="modal-header">Kết thúc ca phân loại</div>
+        <div class="modal-body" style="padding:24px 20px">
+          <div style="font-size:36px;font-weight:800;color:var(--ok);line-height:1">${hopLe}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:16px">Chai hợp lệ</div>
+          <div style="font-size:28px;font-weight:700;color:var(--err);line-height:1">${loi}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Chai lỗi</div>
+          <div style="font-size:13px;color:var(--muted)">Tỉ lệ lỗi: <b>${rate}%</b></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn-confirm" onclick="this.closest('.overlay').remove()">Đã ghi nhận</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+}
 
 // Dev tools — giả lập quét
 document.getElementById("btn-test").onclick = async () => {

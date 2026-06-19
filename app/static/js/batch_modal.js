@@ -102,8 +102,15 @@
 
     window.bmVerifyPw = async function () {
         const pw = document.getElementById("bm-pw").value;
+        const btn = document.querySelector("#bm-step-pw .btn-confirm");
+        if (btn) { btn.disabled = true; btn.textContent = "Đang kiểm tra..."; }
         try {
-            await api(`/api/verify-password?password=${encodeURIComponent(pw)}`, "POST");
+            const r = await fetch("/api/verify-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: pw }),
+            });
+            if (!r.ok) throw new Error("wrong");
             // Mật khẩu đúng → load danh sách lô NCC và hiện form
             document.getElementById("bm-step-pw").classList.add("hidden");
             await bmLoadSuppliers();
@@ -112,6 +119,8 @@
             toast("Mật khẩu không đúng", "err");
             document.getElementById("bm-pw").value = "";
             document.getElementById("bm-pw").focus();
+        } finally {
+            if (btn) { btn.disabled = false; btn.textContent = "Xác nhận"; }
         }
     };
 

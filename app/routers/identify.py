@@ -48,6 +48,22 @@ async def print_one(production_batch_id: int, db: Session = Depends(get_db)):
     return result
 
 
+@router.post("/identify/reprint")
+async def reprint(ma_chai: str, db: Session = Depends(get_db)):
+    """In lại mã cho chai đã lưu DB nhưng laser thất bại lần trước."""
+    from app.devices.manager import device_manager as dm
+    bottle = crud.get_bottle_by_ma(db, ma_chai.strip())
+    if not bottle:
+        raise HTTPException(404, "Không tìm thấy mã chai trong DB")
+    try:
+        await dm.laser.print_code(ma_chai)
+        crud.log_event(db, bottle_id=bottle.id, ma_chai=ma_chai,
+                       event_type="REPRINT", ket_qua="OK")
+        return {"ket_qua": "OK", "ma_chai": ma_chai}
+    except Exception as e:
+        raise HTTPException(503, f"Máy laser vẫn lỗi: {e}")
+
+
 @router.get("/qr")
 def qr_code(data: str):
     """Sinh QR code base64 (PNG) cho mã chai — hiển thị trên UI."""

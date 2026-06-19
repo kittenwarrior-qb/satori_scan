@@ -3,6 +3,7 @@ import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 # Console Windows mặc định cp1252 — ép UTF-8 để log tiếng Việt không crash.
 for _stream in (sys.stdout, sys.stderr):
@@ -47,9 +48,16 @@ async def on_scan(ma_chai: str):
                 result = await classify_bottle(db, ma_chai, sess.id)
                 # Quét trùng VẪN broadcast để UI BÁO ĐỎ cho công nhân thấy,
                 # nhưng frontend sẽ không đếm/không thêm dòng (xem classify.js).
+                iobox_fault = result.pop("iobox_fault", False)
                 result["event"] = "scan"
                 result["tong_hop_le"] = sess.tong_hop_le
                 result["tong_loi"] = sess.tong_loi
+                if iobox_fault:
+                    await ws_manager.broadcast({
+                        "event": "iobox_fault", "ma_chai": ma_chai,
+                        "message": "IO-Box lỗi — chai có thể không bị đẩy ra! "
+                                   "Dừng băng tải và kiểm tra ngay.",
+                    })
                 await ws_manager.broadcast(result)
                 return
 
@@ -57,8 +65,15 @@ async def on_scan(ma_chai: str):
             sess = crud.get_active_session(db, "DINH_DANH")
             if sess:
                 result = await identify_new_bottle(db, sess.production_batch_id, sess.id)
-                result["event"] = "print"
-                await ws_manager.broadcast(result)
+                if result.get("ket_qua") == "PRINT_FAILED":
+                    await ws_manager.broadcast({
+                        "event": "print_failed",
+                        "ma_chai": result.get("ma_chai"),
+                        "message": result.get("message"),
+                    })
+                else:
+                    result["event"] = "print"
+                    await ws_manager.broadcast(result)
                 return
 
             log.info("Quét '%s' — không có ca đang chạy, bỏ qua.", ma_chai)
@@ -77,20 +92,74 @@ async def on_scan(ma_chai: str):
             db.close()
 
 
+async def _heartbeat():
+    """Ping định kỳ qua WS để client phát hiện kết nối chết (half-open)."""
+    while True:
+        await asyncio.sleep(10)
+        try:
+            await ws_manager.broadcast({"event": "heartbeat"})
+        except Exception:
+            pass
+
+
+async def _device_monitor():
+    """Theo dõi trạng thái thiết bị, broadcast ngay khi có thiết bị mất kết nối."""
+    prev: dict[str, str] = {}
+    while True:
+        await asyncio.sleep(3)
+        try:
+            status = await device_manager.status()
+            for key in ("scanner", "iobox", "laser"):
+                cur = status.get(key, "OFFLINE")
+                if prev.get(key) == "OK" and cur != "OK":
+                    await ws_manager.broadcast({
+                        "event": "device_change",
+                        "device": key,
+                        "status": "OFFLINE",
+                    })
+                prev[key] = cur
+        except Exception:
+            pass
+
+
+def _recover_stuck_sessions():
+    """Đóng session bị treo từ lần khởi động trước (mất điện / crash)."""
+    db = SessionLocal()
+    try:
+        cutoff = datetime.now() - timedelta(hours=16)
+        stuck = (db.query(crud.models.Session)
+                 .filter(crud.models.Session.ket_thuc.is_(None),
+                         crud.models.Session.bat_dau < cutoff)
+                 .all())
+        for s in stuck:
+            s.ket_thuc = datetime.now()
+            log.warning("Tự đóng session treo: id=%s bat_dau=%s", s.id, s.bat_dau)
+        if stuck:
+            db.commit()
+    except Exception:
+        log.exception("Lỗi khi phục hồi session treo")
+    finally:
+        db.close()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.config import settings
+    _recover_stuck_sessions()
     device_manager.setup(on_scan)
     await device_manager.connect_all()
     await device_manager.start_scanners()
-    backup_task = None
+    tasks = [
+        asyncio.create_task(_heartbeat()),
+        asyncio.create_task(_device_monitor()),
+    ]
     if settings.backup_enabled:
         from app.services.backup import backup_loop
-        backup_task = asyncio.create_task(backup_loop())
+        tasks.append(asyncio.create_task(backup_loop()))
     log.info("SATORI v2 đã khởi động.")
     yield
-    if backup_task:
-        backup_task.cancel()
+    for t in tasks:
+        t.cancel()
     await device_manager.stop_scanners()
 
 

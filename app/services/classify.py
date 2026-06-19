@@ -16,6 +16,11 @@ log = logging.getLogger("satori.classify")
 _last_seen: dict[str, float] = {}
 
 
+def reset_debounce() -> None:
+    """Xóa bộ nhớ chống quét trùng — gọi khi bắt đầu ca mới."""
+    _last_seen.clear()
+
+
 def _seen_recently(ma_chai: str, window: float) -> bool:
     """True nếu mã vừa được quét trong vòng `window` giây (= quét trùng)."""
     now = time.monotonic()
@@ -28,21 +33,31 @@ def _seen_recently(ma_chai: str, window: float) -> bool:
     return last is not None and (now - last) < window
 
 
+async def _eject(label: str) -> bool:
+    """Đẩy loại chai qua IO-Box. Trả True nếu thành công, False nếu IO-Box lỗi."""
+    try:
+        await device_manager.iobox.day_loai_chai()
+        return True
+    except Exception as exc:
+        log.error("IO-Box lỗi khi đẩy '%s': %s", label, exc)
+        return False
+
+
 async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
     """Xử lý 1 lần quét. Tự gọi đẩy loại nếu cần. Trả về kết quả."""
     # 1. NoRead (scanner báo không đọc được / chuỗi rỗng)
     if not ma_chai or ma_chai == "NOREAD":
-        await device_manager.iobox.day_loai_chai()
+        ejected = await _eject("NOREAD")
         _log(db, None, ma_chai or "", "NOREAD", session_id)
         crud.bump_session(db, session_id, ok=False)
-        return {"ket_qua": "NOREAD", "ma_chai": None}
+        return {"ket_qua": "NOREAD", "ma_chai": None, "iobox_fault": not ejected}
 
     # 2. Format sai → coi như không đọc được
     if parse_ma_chai(ma_chai) is None:
-        await device_manager.iobox.day_loai_chai()
+        ejected = await _eject("FORMAT_ERR")
         _log(db, None, ma_chai, "NOREAD", session_id)
         crud.bump_session(db, session_id, ok=False)
-        return {"ket_qua": "NOREAD", "ma_chai": ma_chai}
+        return {"ket_qua": "NOREAD", "ma_chai": ma_chai, "iobox_fault": not ejected}
 
     # 2b. Chống quét trùng — cùng 1 chai bị kích quét 2 lần liên tiếp (nhiễu băng
     #     tải / cảm biến / quét tay lặp). KHÔNG đẩy loại, KHÔNG tăng đếm tái sử
@@ -58,10 +73,10 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
 
     # 3a. Không tồn tại trong DB
     if bottle is None:
-        await device_manager.iobox.day_loai_chai()
+        ejected = await _eject("UNKNOWN")
         _log(db, None, ma_chai, "UNKNOWN", session_id)
         crud.bump_session(db, session_id, ok=False)
-        return {"ket_qua": "UNKNOWN", "ma_chai": ma_chai}
+        return {"ket_qua": "UNKNOWN", "ma_chai": ma_chai, "iobox_fault": not ejected}
 
     # 3b. Lấy giới hạn tái sử dụng từ lô NCC
     sup = db.get(models.SupplierBatch, bottle.supplier_batch_id)
@@ -69,17 +84,18 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
 
     # 3c. Đã bị loại trước đó (trạng thái âm) → loại tiếp
     if bottle.trang_thai is not None and bottle.trang_thai < 0:
-        await device_manager.iobox.day_loai_chai()
+        ejected = await _eject("REJECTED")
         _log(db, bottle.id, ma_chai, "REJECTED", session_id)
         crud.bump_session(db, session_id, ok=False)
         return {
             "ket_qua": "REJECTED", "ma_chai": ma_chai,
             "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
+            "iobox_fault": not ejected,
         }
 
     # 3d. Vượt giới hạn → loại + đánh dấu trạng thái âm (lý do: quá hạn TSD)
     if bottle.so_lan_thuc_te >= gioi_han:
-        await device_manager.iobox.day_loai_chai()
+        ejected = await _eject("OVER_LIMIT")
         bottle.trang_thai = models.REJECT_OVER_LIMIT
         db.commit()
         _log(db, bottle.id, ma_chai, "OVER_LIMIT", session_id)
@@ -87,6 +103,7 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
         return {
             "ket_qua": "OVER_LIMIT", "ma_chai": ma_chai,
             "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
+            "iobox_fault": not ejected,
         }
 
     # 3e. OK → tăng đếm, cho qua
