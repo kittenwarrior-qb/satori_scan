@@ -43,6 +43,10 @@ loadBatches().catch(e => toast(e.message, "err"));
 // Nhận sự kiện in qua WS
 connectWS(d => {
     if (d.event === "error") { toast(d.message || "Lỗi xử lý", "err"); return; }
+    if (d.event === "scan_no_session") {
+        toast('⚠️ Có tín hiệu quét nhưng chưa bấm "Bắt đầu" ca', "err", 4000);
+        return;
+    }
     if (d.event !== "print") return;
     count++; ok++;
     const row = document.createElement("div");
@@ -62,6 +66,18 @@ async function showQR(ma) {
             `<img src="${d.png_base64}" alt="QR">
              <div class="qr-num">${ma}</div>`;
     } catch {}
+}
+
+// Xóa sạch dữ liệu hiển thị (data ca đã lưu DB) — về trạng thái trống.
+function clearScreen() {
+    count = 0; ok = 0; err = 0;
+    document.getElementById("count").textContent = 0;
+    document.getElementById("stat-ok").textContent = 0;
+    const se = document.getElementById("stat-err");
+    if (se) se.textContent = 0;
+    document.getElementById("rows").innerHTML = "";
+    const qr = document.getElementById("qr-box");
+    if (qr) qr.innerHTML = `<div class="qr-placeholder">Chưa in mã nào</div>`;
 }
 
 function setSessionState(running) {
@@ -91,6 +107,7 @@ document.getElementById("btn-start").onclick = async () => {
         await api("/api/sessions/start", "POST", {
             che_do: "DINH_DANH", production_batch_id: currentBatchId()
         });
+        clearScreen();              // ca mới → bắt đầu lại từ đầu
         setSessionState(true);
         toast("Đã bắt đầu ca định danh", "ok");
     } catch (e) { toast(e.message, "err"); }
@@ -100,7 +117,8 @@ document.getElementById("btn-end").onclick = async () => {
     try {
         const d = await api("/api/sessions/end", "POST", { che_do: "DINH_DANH" });
         setSessionState(false);
-        toast(`Kết thúc ca — Đã in: ${d.tong_hop_le}`, "info", 4000);
+        toast(`Kết thúc ca — Đã in: ${d.tong_hop_le} (đã lưu báo cáo)`, "info", 4000);
+        clearScreen();              // xóa hết hiển thị — data ca đã lưu DB
         loadBatches();
     } catch (e) { toast(e.message, "err"); }
 };

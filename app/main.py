@@ -61,7 +61,12 @@ async def on_scan(ma_chai: str):
                 await ws_manager.broadcast(result)
                 return
 
+            # Không có ca nào đang chạy: KHÔNG xử lý/đếm/lưu, nhưng vẫn báo lên
+            # màn hình để công nhân biết cần bấm "Bắt đầu" (tránh im lặng khó hiểu).
             log.info("Quét '%s' — không có ca đang chạy, bỏ qua.", ma_chai)
+            await ws_manager.broadcast({
+                "event": "scan_no_session", "ma_chai": ma_chai,
+            })
         except Exception:
             # Lỗi thiết bị (IO-Box/Laser mất kết nối...) KHÔNG được làm sập
             # vòng lắng nghe scanner. Ghi log + báo UI, rồi tiếp tục chai sau.
@@ -77,9 +82,35 @@ async def on_scan(ma_chai: str):
             db.close()
 
 
+def _ensure_db():
+    """Tự tạo thư mục data + bảng DB nếu chưa có. An toàn chạy lại nhiều lần
+    (KHÔNG xoá dữ liệu sẵn có — chỉ tạo bảng/index còn thiếu)."""
+    import os as _os
+    from app.database.connection import Base, engine
+    from app.database import models  # noqa: F401 — đăng ký bảng vào metadata
+    _os.makedirs("data", exist_ok=True)
+    _os.makedirs("data/reports", exist_ok=True)
+    Base.metadata.create_all(bind=engine)
+    _indexes = [
+        ("ix_bottles_ma_chai", "bottles", "ma_chai"),
+        ("ix_bottles_ngay_san_xuat", "bottles", "ngay_san_xuat"),
+        ("ix_bottles_production_batch_id", "bottles", "production_batch_id"),
+        ("ix_bottles_supplier_batch_id", "bottles", "supplier_batch_id"),
+        ("ix_scan_events_ma_chai", "scan_events", "ma_chai"),
+        ("ix_scan_events_scanned_at", "scan_events", "scanned_at"),
+        ("ix_sessions_bat_dau", "sessions", "bat_dau"),
+    ]
+    with engine.begin() as conn:
+        for name, table, col in _indexes:
+            conn.exec_driver_sql(
+                f"CREATE INDEX IF NOT EXISTS {name} ON {table} ({col})")
+    log.info("DB sẵn sàng (bảng + index đã kiểm tra).")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     from app.config import settings
+    _ensure_db()
     device_manager.setup(on_scan)
     await device_manager.connect_all()
     await device_manager.start_scanners()

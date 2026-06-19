@@ -6,7 +6,7 @@ from typing import Dict, Optional
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import models
 
@@ -189,5 +189,88 @@ def export_batch_detail(db: Session, so_lo_san_xuat: str) -> Optional[str]:
 
     safe = "".join(c for c in so_lo_san_xuat if c.isalnum() or c in "-_")
     path = os.path.join(REPORT_DIR, f"{safe}.xlsx")
+    wb.save(path)
+    return path
+
+
+def _tt_label(v) -> str:
+    """Trạng thái chai dạng chữ (giống CodeIT: Hợp lệ / Bị lỗi)."""
+    if v is None or v >= 0:
+        return "Hợp lệ"
+    return "Bị lỗi"
+
+
+def bottles_by_date(db: Session, from_date=None, to_date=None,
+                    limit: int = 1000) -> dict:
+    """Danh sách chai theo khoảng NGÀY SẢN XUẤT (xem nhanh, có giới hạn dòng).
+
+    Truy vấn thẳng bảng bottles → chạy được cả trên dữ liệu cũ import từ CodeIT
+    (dữ liệu cũ không có 'ca/session' nên báo cáo theo ca không thấy)."""
+    base = db.query(models.Bottle)
+    if from_date:
+        base = base.filter(models.Bottle.ngay_san_xuat >= from_date)
+    if to_date:
+        base = base.filter(models.Bottle.ngay_san_xuat <= to_date)
+
+    total = base.count()
+    err = base.filter(models.Bottle.trang_thai < 0).count()
+
+    rq = (base.options(joinedload(models.Bottle.production_batch),
+                       joinedload(models.Bottle.supplier_batch))
+          .order_by(models.Bottle.ngay_san_xuat.desc(), models.Bottle.id)
+          .limit(limit))
+    rows = []
+    for bot in rq.all():
+        pb, sb = bot.production_batch, bot.supplier_batch
+        rows.append({
+            "lo_sx": pb.so_lo_san_xuat if pb else "",
+            "lo_ncc": sb.so_lo_ncc if sb else "",
+            "ma_chai": bot.ma_chai,
+            "so_lan_thuc_te": bot.so_lan_thuc_te,
+            "trang_thai": bot.trang_thai,
+            "ngay_san_xuat": bot.ngay_san_xuat.strftime("%d/%m/%Y")
+            if bot.ngay_san_xuat else "",
+        })
+    return {"total": total, "ok": total - err, "err": err,
+            "shown": len(rows), "rows": rows}
+
+
+def export_bottles_by_date(db: Session, from_date=None, to_date=None) -> str:
+    """Xuất Excel TOÀN BỘ chai trong khoảng ngày (giống CodeIT
+    ProductionReport_YYYYMMDD_YYYYMMDD.xls)."""
+    os.makedirs(REPORT_DIR, exist_ok=True)
+    base = db.query(models.Bottle).options(
+        joinedload(models.Bottle.production_batch),
+        joinedload(models.Bottle.supplier_batch))
+    if from_date:
+        base = base.filter(models.Bottle.ngay_san_xuat >= from_date)
+    if to_date:
+        base = base.filter(models.Bottle.ngay_san_xuat <= to_date)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Báo cáo theo ngày"
+    headers = ["Số lô sản xuất", "Số lô nhà cung cấp", "Mã số chai",
+               "Số lần tái sử dụng", "Trạng thái", "Ngày sản xuất"]
+    ws.append(headers)
+    _style_header(ws, len(headers))
+
+    for bot in base.order_by(models.Bottle.ngay_san_xuat,
+                             models.Bottle.id).all():
+        pb, sb = bot.production_batch, bot.supplier_batch
+        ws.append([
+            pb.so_lo_san_xuat if pb else "",
+            sb.so_lo_ncc if sb else "",
+            bot.ma_chai,
+            bot.so_lan_thuc_te,
+            _tt_label(bot.trang_thai),
+            bot.ngay_san_xuat.strftime("%d/%m/%Y") if bot.ngay_san_xuat else "",
+        ])
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = 16
+
+    f = from_date.strftime("%Y%m%d") if from_date else "dau"
+    t = to_date.strftime("%Y%m%d") if to_date else "cuoi"
+    path = os.path.join(REPORT_DIR, f"BaoCaoTheoNgay_{f}_{t}.xlsx")
     wb.save(path)
     return path

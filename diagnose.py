@@ -57,6 +57,38 @@ def run_scanner(port=51236):
         print("  -> Cong dang bi chiem. Dong CodeIT / satori.exe roi thu lai.")
 
 
+def run_scanclient(host, port):
+    """KET NOI TOI scanner (scanner la SERVER) va in byte tho khi quet."""
+    port = int(port)
+    print(f"\n[ScanClient] Ket noi toi scanner {host}:{port} ... (Ctrl+C de dung)")
+    try:
+        s = socket.create_connection((host, port), timeout=5)
+    except Exception as e:
+        print(f"  [LOI] Khong ket noi duoc: {e}")
+        return
+    s.settimeout(None)   # sau khi noi, CHO VO HAN de ban co thoi gian quet
+    print("  [OK] Da ket noi. Hay QUET 1 chai that de xem du lieu:\n")
+    buf = b""
+    try:
+        while True:
+            chunk = s.recv(256)
+            if not chunk:
+                print("  [!] Scanner dong ket noi.")
+                break
+            print(f"  RAW hex : {chunk.hex()}")
+            print(f"  RAW text: {chunk!r}")
+            buf += chunk
+            while b"\x02" in buf and b"\x03" in buf:
+                a = buf.index(b"\x02")
+                b = buf.index(b"\x03", a)
+                print(f"  >>> MA  : {buf[a+1:b].decode(errors='replace')!r}")
+                buf = buf[b+1:]
+    except KeyboardInterrupt:
+        print("\n[ScanClient] Da dung.")
+    finally:
+        s.close()
+
+
 # ---------------------------------------------------------------
 # 2. LASER - gui lenh thu nghiem
 # ---------------------------------------------------------------
@@ -140,6 +172,37 @@ def run_iobox(host, port, coil):
 
 
 # ---------------------------------------------------------------
+# 5. DB PROBE - do xem database 10.1.1.106 la loai gi
+# ---------------------------------------------------------------
+def run_dbprobe(host):
+    ports = [
+        (1433, "Microsoft SQL Server"),
+        (1434, "SQL Server Browser"),
+        (3306, "MySQL / MariaDB"),
+        (5432, "PostgreSQL"),
+        (1521, "Oracle"),
+        (27017, "MongoDB"),
+    ]
+    print(f"\n[DBProbe] Kiem tra database tren {host}:\n")
+    found = []
+    for p, name in ports:
+        try:
+            s = socket.create_connection((host, p), timeout=3)
+            s.close()
+            print(f"  [MO  ] cong {p:5} - {name}   <== co ve la DB nay")
+            found.append((p, name))
+        except Exception:
+            print(f"  [dong] cong {p:5} - {name}")
+    print()
+    if found:
+        print("  -> Loai DB:", ", ".join(n for _, n in found))
+        print("  -> Bao lai cong nao MO de viet script keo toan bo data.")
+    else:
+        print("  -> Khong cong DB nao mo. Co the DB chay cuc bo, hoac sai IP.")
+        print("     Thu xem file cau hinh cua CodeIT (connection string).")
+
+
+# ---------------------------------------------------------------
 # 4. NETWORK PING - kiem tra IP cac thiet bi
 # ---------------------------------------------------------------
 def run_ping():
@@ -170,16 +233,25 @@ def menu():
     ============================================
     Chon:
       1) Ping tat ca thiet bi
-      2) Sniff Scanner  (xem raw bytes / ma chai)
+      2) Test Scanner (KET NOI TOI scanner - scanner la SERVER)
       3) Test Laser     (gui lenh in thu)
       4) Test IO-Box    (bat/tat mot coil)
+      5) Sniff Scanner  (CHO scanner goi vao - kieu cu)
+      6) DB Probe       (do database CodeIT la loai gi)
       q) Thoat
     """))
     choice = input("Nhap lua chon: ").strip().lower()
 
-    if choice == "1":
+    if choice == "6":
+        h = input("IP database [10.1.1.106]: ").strip() or "10.1.1.106"
+        run_dbprobe(h)
+    elif choice == "1":
         run_ping()
     elif choice == "2":
+        h = input("IP scanner [10.1.1.126]: ").strip() or "10.1.1.126"
+        p = input("Port scanner [51236]: ").strip() or "51236"
+        run_scanclient(h, p)
+    elif choice == "5":
         p = input("Port scanner [51236]: ").strip() or "51236"
         run_scanner(p)
     elif choice == "3":
@@ -204,11 +276,15 @@ if __name__ == "__main__":
         menu()
     elif args[0] == "scanner":
         run_scanner(args[1] if len(args) > 1 else 51236)
+    elif args[0] == "scanclient":
+        run_scanclient(args[1], args[2] if len(args) > 2 else 51236)
     elif args[0] == "laser":
         run_laser(args[1], args[2], args[3] if len(args) > 3 else None)
     elif args[0] == "iobox":
         run_iobox(args[1], args[2], args[3])
     elif args[0] == "ping":
         run_ping()
+    elif args[0] == "dbprobe":
+        run_dbprobe(args[1] if len(args) > 1 else "10.1.1.106")
     else:
         print(__doc__)

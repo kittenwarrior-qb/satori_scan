@@ -122,6 +122,52 @@ document.getElementById("btn-export-shift").onclick = async () => {
     } catch (e) { toast(e.message, "err"); }
 };
 
+// ── Báo cáo theo NGÀY (toàn bộ chai, chạy được trên data cũ CodeIT) ──
+document.getElementById("bd-from").value = _firstOfMonth();
+document.getElementById("bd-to").value = _today();
+
+function bdQS() {
+    const f = document.getElementById("bd-from").value;
+    const t = document.getElementById("bd-to").value;
+    const p = new URLSearchParams();
+    if (f) p.set("from_date", f);
+    if (t) p.set("to_date", t);
+    return p.toString();
+}
+
+async function loadByDate() {
+    try {
+        const d = await api(`/api/reports/by-date?${bdQS()}`);
+        document.getElementById("bd-total").textContent = d.total;
+        document.getElementById("bd-ok").textContent = d.ok;
+        document.getElementById("bd-err").textContent = d.err;
+        document.getElementById("bd-note").textContent = d.total > d.shown
+            ? ` — hiển thị ${d.shown} dòng đầu, bấm "Xuất Excel" để lấy đủ ${d.total}`
+            : "";
+        document.getElementById("bd-rows").innerHTML = d.rows.length
+            ? d.rows.map(x => `
+                <div class="table-row result-grid">
+                    <span>${x.lo_sx}</span>
+                    <span>${x.lo_ncc}</span>
+                    <span>${x.ma_chai}</span>
+                    <span>${x.so_lan_thuc_te}</span>
+                    <span>${ttBadge(x.trang_thai)}</span>
+                    <span>${x.ngay_san_xuat}</span>
+                </div>`).join("")
+            : `<div class="table-row" style="padding:16px;color:var(--muted)">Không có chai trong khoảng ngày này</div>`;
+    } catch (e) { toast(e.message, "err"); }
+}
+document.getElementById("btn-bydate").onclick = loadByDate;
+
+document.getElementById("btn-export-bydate").onclick = async () => {
+    try {
+        toast("Đang xuất... (data lớn có thể mất vài giây)", "info");
+        const d = await api(`/api/reports/export/by-date?${bdQS()}`, "POST");
+        toast(`Xuất xong: ${d.filename}`, "ok");
+        window.location = `/api/reports/download?filename=${encodeURIComponent(d.filename)}`;
+    } catch (e) { toast(e.message, "err"); }
+};
+
 document.getElementById("btn-backup").onclick = async () => {
     try {
         const d = await api("/api/reports/backup", "POST");

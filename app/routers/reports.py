@@ -93,6 +93,23 @@ def export_shifts(from_date: Optional[str] = None, to_date: Optional[str] = None
     return {"path": path, "filename": os.path.basename(path)}
 
 
+@router.get("/reports/by-date")
+def by_date(from_date: Optional[str] = None, to_date: Optional[str] = None,
+            db: Session = Depends(get_db)):
+    """Xem nhanh chai theo khoảng ngày SX (chạy được trên data cũ CodeIT)."""
+    return report_svc.bottles_by_date(db, _parse_date(from_date),
+                                      _parse_date(to_date))
+
+
+@router.post("/reports/export/by-date")
+def export_by_date(from_date: Optional[str] = None,
+                   to_date: Optional[str] = None,
+                   db: Session = Depends(get_db)):
+    path = report_svc.export_bottles_by_date(db, _parse_date(from_date),
+                                             _parse_date(to_date))
+    return {"path": path, "filename": os.path.basename(path)}
+
+
 @router.get("/reports/trace")
 def trace(ma_chai: str, db: Session = Depends(get_db)):
     """Truy vết toàn bộ lịch sử quét của 1 chai."""

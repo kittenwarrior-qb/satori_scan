@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import random
+import time
 
 from app.devices.base import BaseScanner
 
@@ -9,10 +10,17 @@ log = logging.getLogger("satori.scanner")
 
 STX, ETX = b"\x02", b"\x03"
 
+# Scanner thường nối-gửi-rồi-ngắt sau mỗi lần quét. Coi là "đang kết nối" nếu
+# vừa có hoạt động (kết nối hoặc đọc mã) trong khoảng này → trạng thái xanh ổn
+# định khi băng tải chạy, chỉ đỏ khi scanner im lặng thật lâu (mất kết nối).
+SCANNER_GRACE_SEC = 30.0
+
 
 # ── REAL: Datalogic Matrix qua TCP ──
 class RealScanner(BaseScanner):
-    """Lắng nghe 1 scanner TCP. Mỗi mã đọc được gọi on_scan(ma).
+    """KẾT NỐI TỚI scanner TCP (scanner đóng vai SERVER, vd Datalogic Matrix ở
+    10.1.1.126:51236). App là client: mở kết nối, đọc frame STX+data+ETX, gọi
+    on_scan(ma). Tự kết nối lại nếu rớt.
 
     Để hỗ trợ nhiều scanner, DeviceManager tạo nhiều RealScanner cùng on_scan.
     """
@@ -20,49 +28,76 @@ class RealScanner(BaseScanner):
     def __init__(self, on_scan, host, port):
         super().__init__(on_scan)
         self.host, self.port = host, port
-        self._server = None
-        self._clients = 0   # số máy scan đang thực sự kết nối tới server
+        self._running = False
+        self._connected = False
+        self._writer = None
+        self._last_seen = 0.0  # monotonic lần cuối nối/đọc mã
 
     async def start(self):
-        async def handle(reader, writer):
-            peer = writer.get_extra_info("peername")
-            log.info("Scanner kết nối: %s", peer)
-            self._clients += 1
-            buf = b""
+        self._running = True
+        while self._running:
             try:
-                while True:
-                    chunk = await reader.read(512)
-                    if not chunk:
-                        break
-                    buf += chunk
-                    while ETX in buf:
-                        e = buf.find(ETX)
-                        # STX của chính frame này = STX cuối cùng TRƯỚC ETX.
-                        # Dùng rfind để không lấy nhầm STX của frame kế tiếp.
-                        stx = buf.rfind(STX, 0, e)
-                        s = stx + 1 if stx != -1 else 0
-                        ma = buf[s:e].decode(errors="ignore").strip()
-                        buf = buf[e + 1:]
-                        if ma:
-                            await self.on_scan(ma)
+                reader, writer = await asyncio.open_connection(
+                    self.host, self.port)
+                self._writer = writer
+                self._connected = True
+                self._last_seen = time.monotonic()
+                log.info("RealScanner đã kết nối tới scanner %s:%s",
+                         self.host, self.port)
+                await self._read_loop(reader)
+            except (OSError, asyncio.TimeoutError) as e:
+                log.warning("RealScanner không kết nối được %s:%s (%s) — thử lại 3s",
+                            self.host, self.port, e)
             finally:
-                self._clients = max(0, self._clients - 1)
-                log.info("Scanner ngắt kết nối: %s", peer)
-                writer.close()
+                self._connected = False
+                if self._writer:
+                    try:
+                        self._writer.close()
+                    except Exception:
+                        pass
+                    self._writer = None
+            if self._running:
+                await asyncio.sleep(3)   # chờ rồi kết nối lại
 
-        self._server = await asyncio.start_server(handle, self.host, self.port)
-        log.info("RealScanner lắng nghe %s:%s", self.host, self.port)
-        async with self._server:
-            await self._server.serve_forever()
+    async def _read_loop(self, reader):
+        buf = b""
+        while self._running:
+            chunk = await reader.read(512)
+            if not chunk:          # scanner đóng kết nối
+                log.info("Scanner %s:%s ngắt kết nối", self.host, self.port)
+                break
+            self._last_seen = time.monotonic()
+            buf += chunk
+            # Chấp nhận cả ETX (0x03) lẫn xuống dòng (\n) làm dấu kết thúc frame.
+            # Scanner Datalogic Foenix ở nhà máy gói kiểu: STX + data + \r\n.
+            while True:
+                idx_n = buf.find(b"\n")
+                idx_e = buf.find(ETX)
+                ends = [i for i in (idx_n, idx_e) if i != -1]
+                if not ends:
+                    break
+                end = min(ends)
+                frame = buf[:end]
+                buf = buf[end + 1:]
+                # Bỏ STX/ETX/CR/khoảng trắng ở hai đầu
+                ma = frame.strip(b"\x02\x03\r\n \t").decode(errors="ignore").strip()
+                if ma:
+                    await self.on_scan(ma)
 
     async def stop(self):
-        if self._server:
-            self._server.close()
+        self._running = False
+        if self._writer:
+            try:
+                self._writer.close()
+            except Exception:
+                pass
 
     async def is_connected(self) -> bool:
-        # Chỉ OK khi có ít nhất 1 máy scan ĐANG kết nối — không còn "ảo OK".
-        return (self._server is not None and self._server.is_serving()
-                and self._clients > 0)
+        # OK khi đang giữ kết nối, HOẶC vừa có dữ liệu trong SCANNER_GRACE_SEC
+        # (phòng scanner ngắt-nối từng lúc).
+        if self._connected:
+            return True
+        return (time.monotonic() - self._last_seen) < SCANNER_GRACE_SEC
 
 
 # ── MOCK: chờ inject từ API / auto random ──

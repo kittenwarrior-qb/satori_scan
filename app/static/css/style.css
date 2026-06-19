@@ -414,7 +414,7 @@ main {
 .placeholder { color: var(--muted); font-size: 12px; }
 
 /* ── Tables ── */
-.table-head, .table-row { display: grid; padding: 7px 10px; gap: 6px; align-items: center; }
+.table-head, .table-row, .table-foot { display: grid; padding: 7px 10px; gap: 6px; align-items: center; }
 .classify-grid { grid-template-columns: 32px 2fr 1.2fr 0.8fr 0.8fr 1fr; }
 .identify-grid { grid-template-columns: 36px 2.2fr 1.2fr; }
 .reject-grid   { grid-template-columns: 36px 2fr 1.2fr 1.3fr; }
@@ -438,6 +438,14 @@ main {
 .table-row.ok   { background: #eef8ee; }
 .table-row.err  { background: #fff0f0; }
 .table-row.warn { background: #fffbee; }
+.table-foot {
+  background: var(--blue-lt);
+  color: var(--blue-dk);
+  font-size: 13px;
+  font-weight: 700;
+  border-top: 2px solid var(--blue);
+  flex-shrink: 0;
+}
 .row-count {
   padding: 5px 10px;
   background: #f4f7fa;
@@ -884,3 +892,114 @@ input:focus, select:focus { outline: none; border-color: var(--blue); box-shadow
 .controls { display: flex; gap: 8px; }
 .btn-link { color: var(--muted); font-size: 13px; padding: 5px 0; display: inline-block; }
 .btn-link:hover { color: var(--blue); }
+
+/* ══════════════════════════════════════════════════════════
+   KIOSK BIG — CHỮ TO & NÚT TO cho màn hình tủ PLC (nhìn từ xa).
+   Đặt CUỐI file để override mọi media query phía trên.
+   ══════════════════════════════════════════════════════════ */
+html, body { font-size: 16px; }
+
+/* Tiêu đề + header */
+.screen-title { font-size: 30px; }
+.topbar { height: 58px; }
+.logo-img { height: 40px; }
+#clock { font-size: 16px; }
+.brand-info { font-size: 14px; }
+
+/* ───────────────────────────────────────────────────────────
+   CTA BUTTONS — to, màu đặc, chiều sâu nhấn 3D (cho cảm ứng)
+   Quy ước màu: XANH = bắt đầu/chạy · CAM = kết thúc/dừng
+   ─────────────────────────────────────────────────────────── */
+.action-bar { height: 72px; padding: 0 18px; gap: 16px; }
+
+/* Nút BẮT ĐẦU — CTA chính, xanh đặc */
+.btn-act-ok {
+  background: var(--green); color: #fff; border: none;
+  height: 56px; min-width: 175px; padding: 0 34px;
+  font-size: 22px; font-weight: 800; letter-spacing: .3px;
+  border-radius: 10px;
+  box-shadow: 0 4px 0 var(--green-dk), 0 5px 12px rgba(0,0,0,.28);
+  transition: transform .05s, background .12s;
+}
+.btn-act-ok:hover:not(:disabled) { background: #34b034; }
+.btn-act-ok:active:not(:disabled) {
+  transform: translateY(3px); box-shadow: 0 1px 0 var(--green-dk);
+}
+.btn-act-ok:disabled {
+  background: #a9c7a9; color: #eef3ee; box-shadow: none; cursor: not-allowed;
+}
+
+/* Nút KẾT THÚC — dừng, cam đặc */
+.btn-act-stop {
+  background: var(--orange); color: #fff; border: none;
+  height: 56px; min-width: 175px; padding: 0 34px;
+  font-size: 22px; font-weight: 800; letter-spacing: .3px;
+  border-radius: 10px;
+  box-shadow: 0 4px 0 var(--satori-orange-dk), 0 5px 12px rgba(0,0,0,.28);
+  transition: transform .05s, background .12s;
+}
+.btn-act-stop:hover:not(:disabled) { background: #ffa733; }
+.btn-act-stop:active:not(:disabled) {
+  transform: translateY(3px); box-shadow: 0 1px 0 var(--satori-orange-dk);
+}
+.btn-act-stop:disabled {
+  background: #e0c19a; color: #fff; box-shadow: none; cursor: not-allowed;
+}
+
+/* Nút phụ (Loại bỏ thủ công) — viền, ít nổi hơn */
+.btn-act-link {
+  background: transparent; color: #fff;
+  border: 2px solid rgba(255,255,255,.75);
+  height: 52px; padding: 0 24px;
+  font-size: 17px; font-weight: 700; border-radius: 10px;
+}
+.btn-act-link:hover { background: rgba(255,255,255,.16); }
+
+.session-pill { font-size: 17px; padding: 11px 22px; }
+
+/* Info block đầu trang */
+.info-block-header { font-size: 16px; padding: 8px 14px; }
+.info-select-row label { font-size: 15px; }
+.info-select-row select { height: 40px; font-size: 17px; }
+.info-field label { font-size: 15px; min-width: 165px; }
+.info-field .fval { font-size: 17px; padding: 7px 11px; }
+
+/* Bảng danh sách quét — to, đọc từ xa */
+.table-head { font-size: 15px; padding: 10px 10px; }
+.table-row  { font-size: 18px; padding: 12px 10px; }
+.badge { font-size: 15px; padding: 5px 13px; }
+.tbl-label, .table-panel-label { font-size: 16px; padding: 9px 12px; }
+.row-count { font-size: 15px; padding: 8px 10px; }
+
+/* Panel phải rộng hơn để chứa chữ to */
+.content-right { width: 360px; }
+
+/* Số liệu hợp lệ / lỗi + trạng thái thiết bị */
+.sbox-title { font-size: 14px; padding: 8px 12px; }
+.stat-row { font-size: 17px; padding: 9px 0; }
+.stat-row .sval { font-size: 30px; min-width: 70px; padding: 4px 14px; }
+.dev-table, .dev-table th, .dev-table td { font-size: 15px; }
+.dev-table th { padding: 8px 10px; }
+.dev-table td { padding: 10px 10px; }
+
+/* Kết quả quét lớn (giữa panel phải) */
+.scan-big { gap: 10px; padding: 18px 10px; }
+.scan-big .sb-icon { font-size: 64px; }
+.scan-big .sb-ma   { font-size: 32px; letter-spacing: 2px; }
+.scan-big .sb-badge { font-size: 20px; padding: 7px 20px; }
+
+/* QR & mã (màn định danh) */
+.qr-large img { width: 160px; height: 160px; }
+.qr-large .qr-num { font-size: 30px; }
+
+/* Trang chủ — 3 nút điều hướng lớn (CTA) */
+.home-cards { gap: 18px; max-width: 880px; }
+.home-card {
+  padding: 30px 28px 28px; border-left-width: 8px; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.10);
+}
+.home-card:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(22,108,148,.22); }
+.hc-num   { font-size: 16px; }
+.hc-title { font-size: 26px; font-weight: 800; }
+.hc-desc  { font-size: 16px; }
+.sbox-title { letter-spacing: .3px; }

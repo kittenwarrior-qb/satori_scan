@@ -167,3 +167,15 @@ def log_event(db: Session, **kwargs):
     db.add(e)
     db.commit()
     return e
+
+
+def list_scan_events_for_session(db: Session, session_id: int, limit: int = 200):
+    """N sự kiện quét mới nhất của 1 ca (mới → cũ). Dùng để nạp lại màn hình
+    phân loại sau khi chuyển tab."""
+    return (
+        db.query(models.ScanEvent)
+        .filter(models.ScanEvent.session_id == session_id)
+        .order_by(models.ScanEvent.id.desc())
+        .limit(limit)
+        .all()
+    )

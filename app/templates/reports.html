@@ -58,6 +58,35 @@
 
     <div class="section-block">
         <div class="section-head">
+            <h3>Báo cáo theo ngày (toàn bộ chai — chạy được trên data cũ)</h3>
+            <button id="btn-export-bydate" class="btn-print">&#8595; Xuất Excel theo ngày</button>
+        </div>
+        <div class="search-bar">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                Từ <input id="bd-from" type="date" style="width:150px">
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)">
+                Đến <input id="bd-to" type="date" style="width:150px">
+            </label>
+            <button id="btn-bydate" class="btn-start" style="width:110px;flex-shrink:0;height:34px">Xem</button>
+        </div>
+        <div class="row-count" style="margin-bottom:8px">
+            Tổng: <b id="bd-total">0</b> chai ·
+            <b id="bd-ok" style="color:var(--ok)">0</b> hợp lệ ·
+            <b id="bd-err" style="color:var(--err)">0</b> lỗi
+            <span id="bd-note" style="color:var(--muted);font-weight:400"></span>
+        </div>
+        <div class="table-wrap">
+            <div class="table-head result-grid">
+                <span>Lô SX</span><span>Lô NCC</span><span>Mã chai</span>
+                <span>TSD thực tế</span><span>Trạng thái</span><span>Ngày SX</span>
+            </div>
+            <div id="bd-rows" class="table-body" style="max-height:320px"></div>
+        </div>
+    </div>
+
+    <div class="section-block">
+        <div class="section-head">
             <h3>Tìm kiếm</h3>
         </div>
         <div class="search-bar">

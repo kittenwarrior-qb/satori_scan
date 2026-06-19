@@ -2,12 +2,47 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from app.database import crud
+from app.database import crud, models
 from app.database.connection import get_db
 from app.devices.manager import device_manager
 from app.services.reject import reject_bottle
 
 router = APIRouter()
+
+
+@router.get("/classify/scans")
+def classify_scans(limit: int = 200, db: Session = Depends(get_db)):
+    """Nạp lại danh sách quét của ca PHÂN LOẠI đang chạy để khôi phục màn hình
+    sau khi chuyển tab. Trả mới → cũ; kèm tổng để khôi phục bộ đếm."""
+    sess = crud.get_active_session(db, "PHAN_LOAI")
+    if not sess:
+        return {"active": False, "scans": [],
+                "tong_hop_le": 0, "tong_loi": 0, "count": 0}
+
+    scans = []
+    for e in crud.list_scan_events_for_session(db, sess.id, limit):
+        gioi_han = so_lan = None
+        if e.bottle_id:
+            b = db.get(models.Bottle, e.bottle_id)
+            if b:
+                so_lan = b.so_lan_thuc_te
+                sup = db.get(models.SupplierBatch, b.supplier_batch_id)
+                gioi_han = sup.so_lan_tai_su_dung if sup else None
+        scans.append({
+            "ma_chai": e.ma_chai,
+            "ket_qua": e.ket_qua,
+            "scanned_at": e.scanned_at.isoformat() if e.scanned_at else None,
+            "gioi_han": gioi_han,
+            "so_lan_thuc_te": so_lan,
+        })
+
+    return {
+        "active": True,
+        "scans": scans,
+        "tong_hop_le": sess.tong_hop_le,
+        "tong_loi": sess.tong_loi,
+        "count": sess.tong_hop_le + sess.tong_loi,
+    }
 
 
 @router.post("/classify/test")

@@ -3,12 +3,12 @@ import logging
 import time
 from typing import Dict
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.database import crud, models
 from app.devices.manager import device_manager
-from app.services.ma_chai import parse_ma_chai
 
 log = logging.getLogger("satori.classify")
 
@@ -31,19 +31,17 @@ def _seen_recently(ma_chai: str, window: float) -> bool:
 
 async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
     """Xử lý 1 lần quét. Tự gọi đẩy loại nếu cần. Trả về kết quả."""
-    # 1. NoRead (scanner báo không đọc được / chuỗi rỗng)
-    if not ma_chai or ma_chai == "NOREAD":
+    # 1. NoRead (scanner báo không đọc được / chuỗi rỗng).
+    #    Scanner Foenix gửi "NoRead" → so sánh không phân biệt hoa/thường.
+    if not ma_chai or ma_chai.upper() == "NOREAD":
         await device_manager.iobox.day_loai_chai()
         _log(db, None, ma_chai or "", "NOREAD", session_id)
         crud.bump_session(db, session_id, ok=False)
         return {"ket_qua": "NOREAD", "ma_chai": None}
 
-    # 2. Format sai → coi như không đọc được
-    if parse_ma_chai(ma_chai) is None:
-        await device_manager.iobox.day_loai_chai()
-        _log(db, None, ma_chai, "NOREAD", session_id)
-        crud.bump_session(db, session_id, ok=False)
-        return {"ket_qua": "NOREAD", "ma_chai": ma_chai}
+    # (Trước đây có kiểm tra "phải đúng 11 chữ số" — ĐÃ BỎ. Mã laser thật của
+    #  nhà máy là chuỗi 6 ký tự chữ-số như "S01QHQ", không phải 11 số. Tính hợp
+    #  lệ do việc TRA DB quyết định: có trong DB → xử lý; không có → UNKNOWN.)
 
     # 2b. Chống quét trùng — cùng 1 chai bị kích quét 2 lần liên tiếp (nhiễu băng
     #     tải / cảm biến / quét tay lặp). KHÔNG đẩy loại, KHÔNG tăng đếm tái sử
@@ -75,6 +73,25 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
         crud.bump_session(db, session_id, ok=False)
         return {
             "ket_qua": "REJECTED", "ma_chai": ma_chai,
+            "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
+        }
+
+    # 3c2. ĐÃ ĐƯỢC QUÉT HỢP LỆ TRONG NGÀY HÔM NAY → KHÔNG tăng số lần nữa.
+    #      1 chai chỉ đếm 1 lần/ngày. Quét lại trong ngày → báo đỏ "đã cập nhật"
+    #      (giống CodeIT). KHÔNG đẩy loại (chai vẫn hợp lệ), chỉ không đếm thêm.
+    da_quet_hom_nay = (
+        db.query(models.ScanEvent.id)
+        .filter(models.ScanEvent.ma_chai == ma_chai,
+                models.ScanEvent.ket_qua == "OK",
+                func.date(models.ScanEvent.scanned_at, "localtime")
+                == func.date("now", "localtime"))
+        .first()
+    )
+    if da_quet_hom_nay:
+        _log(db, bottle.id, ma_chai, "ALREADY_UPDATED", session_id)
+        crud.bump_session(db, session_id, ok=False)
+        return {
+            "ket_qua": "ALREADY_UPDATED", "ma_chai": ma_chai,
             "so_lan_thuc_te": bottle.so_lan_thuc_te, "gioi_han": gioi_han,
         }
 
