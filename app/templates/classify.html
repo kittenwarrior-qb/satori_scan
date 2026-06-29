@@ -63,9 +63,11 @@
       <!-- Kết quả quét gần nhất -->
       <div class="sbox sbox-grow" style="display:flex;flex-direction:column">
         <div class="sbox-title">Kết quả quét</div>
-        <div class="scan-big scan-idle" id="scan-result">
-          <div class="sb-icon">&#128269;</div>
-          <div class="sb-ma">Chờ quét...</div>
+        <div id="reject-warn" class="reject-warn"></div>
+        <div class="scan-big scan-paused" id="scan-result" data-scanned="0">
+          <div class="sb-icon">&#9208;</div>
+          <div class="sb-ma">CHƯA BẮT ĐẦU CA</div>
+          <span class="sb-badge" style="background:#475569;color:#fff">Bấm "Bắt đầu" để quét</span>
         </div>
       </div>
 

@@ -88,6 +88,29 @@ async def test_bad_format(db):
 
 
 @pytest.mark.asyncio
+async def test_ok_khong_co_iobox_fault(db):
+    """Chai OK không đẩy loại nên không bao giờ báo lỗi IO-Box."""
+    r = await classify_svc.classify_bottle(db, "20010800001", 1)
+    assert r.get("iobox_fault") is None  # OK path không gắn cờ
+
+
+@pytest.mark.asyncio
+async def test_iobox_loi_van_loai_va_bao_co(db):
+    """IO-Box lỗi khi đẩy chai quá hạn: vẫn đánh dấu loại + gắn cờ iobox_fault."""
+    class BrokenIOBox(MockIOBox):
+        async def day_loai_chai(self):
+            raise RuntimeError("ModBus mất kết nối")
+    device_manager.iobox = BrokenIOBox()
+
+    r = await classify_svc.classify_bottle(db, "20010800002", 1)
+    assert r["ket_qua"] == "OVER_LIMIT"
+    assert r["iobox_fault"] is True
+    # Dù IO-Box lỗi, chai vẫn được đánh dấu loại trong DB
+    b = classify_svc.crud.get_bottle_by_ma(db, "20010800002")
+    assert b.trang_thai == -1
+
+
+@pytest.mark.asyncio
 async def test_quet_trung_khong_tang_dem(db):
     """Quét cùng 1 mã 2 lần liên tiếp: lần 2 là DUPLICATE, TSD không tăng tiếp."""
     r1 = await classify_svc.classify_bottle(db, "20010800001", 1)

@@ -762,6 +762,20 @@ input:focus, select:focus { outline: none; border-color: var(--blue); box-shadow
 .scan-err  { background:var(--err-lt); border-top:3px solid var(--err); }
 .scan-warn { background:var(--warn-lt);border-top:3px solid var(--warn); }
 .scan-idle { background:#f4f7fa; }
+.scan-paused { background:#e2e8f0; border-top:3px solid #475569; }
+/* Nhấp nháy khi LOẠI để dễ thấy từ xa */
+.scan-flash { animation: scanFlash .5s ease-out 1; }
+@keyframes scanFlash {
+  0%   { transform:scale(1);    box-shadow:0 0 0 0 rgba(220,38,38,.6); }
+  30%  { transform:scale(1.04); box-shadow:0 0 0 8px rgba(220,38,38,0); }
+  100% { transform:scale(1);    box-shadow:0 0 0 0 rgba(220,38,38,0); }
+}
+/* Cảnh báo tỉ lệ loại cao bất thường */
+.reject-warn {
+  display:none; background:#fef2f2; color:#b91c1c; border:1px solid #fca5a5;
+  border-radius:4px; padding:6px 10px; font-size:12px; font-weight:700;
+  margin-bottom:6px; text-align:center;
+}
 
 /* Table label bar */
 .tbl-label {

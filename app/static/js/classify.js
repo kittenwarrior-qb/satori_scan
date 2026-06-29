@@ -2,6 +2,34 @@
 let count = 0, ok = 0, err = 0;
 let activeBatchId = null;
 
+// ── Âm thanh báo (xưởng ồn — công nhân không nhìn màn hình liên tục) ──
+let _audioCtx = null;
+function _ensureAudio() {
+    try {
+        if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (_audioCtx.state === "suspended") _audioCtx.resume();
+    } catch { _audioCtx = null; }
+    return _audioCtx;
+}
+function _beep(freq, durMs, gain = 0.25) {
+    const ctx = _ensureAudio();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = freq;
+    g.gain.value = gain;
+    osc.connect(g); g.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durMs / 1000);
+}
+function alarmReject() { _beep(380, 350); }                 // 1 tiếng trầm = loại
+function alarmFault() {                                      // 3 tiếng gấp = sự cố
+    _beep(880, 150);
+    setTimeout(() => _beep(880, 150), 200);
+    setTimeout(() => _beep(880, 150), 400);
+}
+
 // Hiện dev-bar nếu đang mock
 api("/api/is-mock").then(d => {
     const bar = document.getElementById("dev-bar");
@@ -16,6 +44,24 @@ const STATUS = {
     REJECTED:   { label: "Đã loại trước đó",  cls: "err",  icon: "❌" },
     DUPLICATE:  { label: "QUÉT TRÙNG",        cls: "err",  icon: "🔁" },
 };
+
+// ── Cảnh báo tỉ lệ loại cao bất thường (sai lô / lệch máy quét) ──
+const _recent = [];
+function trackRejectRate(isOk) {
+    _recent.push(isOk);
+    if (_recent.length > 20) _recent.shift();
+    const fails = _recent.filter(x => !x).length;
+    const warn = document.getElementById("reject-warn");
+    if (!warn) return;
+    if (_recent.length >= 8 && fails / _recent.length >= 0.4) {
+        warn.style.display = "block";
+        warn.textContent =
+            `⚠ Tỉ lệ loại cao bất thường (${fails}/${_recent.length} chai gần đây) — ` +
+            `kiểm tra đúng lô SX và vị trí máy quét`;
+    } else {
+        warn.style.display = "none";
+    }
+}
 
 deviceBar("device-bar");
 
@@ -62,10 +108,12 @@ connectWS(wsHandler, syncCounters);
 
 function wsHandler(d) {
     if (d.event === "iobox_fault") {
+        alarmFault();
         toast(`⚠ IO-Box lỗi — chai có thể không bị đẩy ra! ${d.message || ""}`, "err", 15000);
         return;
     }
     if (d.event === "error") {
+        alarmReject();
         toast(d.message || "Lỗi xử lý quét", "err", 8000);
         return;
     }
@@ -73,11 +121,17 @@ function wsHandler(d) {
 
     const st = STATUS[d.ket_qua] || STATUS.NOREAD;
 
+    // Cảnh báo IO-Box nếu chai loại nhưng đẩy không thành công
+    if (d.iobox_fault) {
+        alarmFault();
+        toast(`⚠ IO-Box không đẩy được chai ${d.ma_chai || ""} — lấy ra thủ công!`, "err", 15000);
+    }
+
     // Quét trùng: BÁO ĐỎ nhưng KHÔNG đếm, KHÔNG thêm dòng
     if (d.ket_qua === "DUPLICATE") {
         toast(`⚠ Quét trùng — bỏ qua: ${d.ma_chai}`, "err", 4000);
         const p = document.getElementById("scan-result");
-        p.className = "scan-big scan-err";
+        p.className = "scan-big scan-err scan-flash";
         p.innerHTML = `<div class="sb-icon">${st.icon}</div>
             <div class="sb-ma">${d.ma_chai || "—"}</div>
             <span class="sb-badge badge err">${st.label}</span>`;
@@ -85,7 +139,12 @@ function wsHandler(d) {
     }
 
     count++;
-    if (d.ket_qua === "OK") ok++; else err++;
+    const isOk = d.ket_qua === "OK";
+    if (isOk) ok++; else err++;
+
+    // Âm thanh: chỉ kêu khi LOẠI (OK thì im để tránh nhức tai cả ca)
+    if (!isOk) alarmReject();
+    trackRejectRate(isOk);
 
     const row = document.createElement("div");
     row.className = `table-row classify-grid ${st.cls}`;
@@ -103,8 +162,12 @@ function wsHandler(d) {
     document.getElementById("stat-err").textContent = err;
 
     const panel = document.getElementById("scan-result");
+    panel.dataset.scanned = "1";
     const clsMap = { ok: "scan-ok", err: "scan-err", warn: "scan-warn" };
-    panel.className = `scan-big ${clsMap[st.cls] || "scan-idle"}`;
+    // reflow để animation chạy lại mỗi lần quét
+    panel.className = "scan-big";
+    void panel.offsetWidth;
+    panel.className = `scan-big ${clsMap[st.cls] || "scan-idle"}${isOk ? "" : " scan-flash"}`;
     panel.innerHTML = `
         <div class="sb-icon">${st.icon}</div>
         <div class="sb-ma">${d.ma_chai || "—"}</div>
@@ -115,16 +178,34 @@ function setSessionState(running) {
     const pill     = document.getElementById("session-status");
     const btnStart = document.getElementById("btn-start");
     const btnEnd   = document.getElementById("btn-end");
+    const panel    = document.getElementById("scan-result");
     if (running) {
         pill.textContent  = "⬤ Ca đang chạy";
         pill.className    = "session-pill session-running";
         btnStart.disabled = true;
         btnEnd.disabled   = false;
+        // Chỉ đặt trạng thái "chờ quét" nếu chưa có kết quả nào
+        if (panel && panel.dataset.scanned !== "1") {
+            panel.className = "scan-big scan-idle";
+            panel.innerHTML =
+                `<div class="sb-icon">&#128269;</div><div class="sb-ma">Chờ quét...</div>`;
+        }
     } else {
         pill.textContent  = "⬤ Chưa bắt đầu";
         pill.className    = "session-pill session-idle";
         btnStart.disabled = false;
         btnEnd.disabled   = true;
+        if (panel) {
+            panel.dataset.scanned = "0";
+            panel.className = "scan-big scan-paused";
+            panel.innerHTML =
+                `<div class="sb-icon">&#9208;</div>
+                 <div class="sb-ma">CHƯA BẮT ĐẦU CA</div>
+                 <span class="sb-badge" style="background:#475569;color:#fff">Bấm "Bắt đầu" để quét</span>`;
+        }
+        const warn = document.getElementById("reject-warn");
+        if (warn) warn.style.display = "none";
+        _recent.length = 0;
     }
 }
 
@@ -135,6 +216,7 @@ api("/api/sessions/active?che_do=PHAN_LOAI")
 // Bắt đầu ca — disable ngay trước await để tránh double-click
 document.getElementById("btn-start").onclick = async () => {
     const btn = document.getElementById("btn-start");
+    _ensureAudio();   // mở khóa âm thanh bằng cử chỉ người dùng (yêu cầu của trình duyệt)
     btn.disabled = true;
     try {
         if (!activeBatchId) {
