@@ -17,23 +17,67 @@ class RealIOBox(BaseIOBox):
         self.coil_bang_tai = settings.iobox_coil_bang_tai
         self.coil_day_loai = settings.iobox_coil_day_loai
         self.pulse_width   = settings.iobox_pulse_width
+        self.slave_id      = settings.iobox_slave_id
+        self.use_multi     = settings.iobox_write_mode.strip().lower() == "multi"
 
     async def connect(self):
         await self.client.connect()
-        log.info("RealIOBox connect %s:%s -> %s (coil_bang_tai=%s coil_day_loai=%s)",
+        log.info("RealIOBox connect %s:%s -> %s (slave=%s coil_bang_tai=%s coil_day_loai=%s)",
                  self.host, self.port, self.client.connected,
-                 self.coil_bang_tai, self.coil_day_loai)
+                 self.slave_id, self.coil_bang_tai, self.coil_day_loai)
+
+    async def _write_coil(self, address: int, value: bool, label: str) -> bool:
+        """Ghi 1 coil + KIỂM TRA phản hồi.
+
+        pymodbus KHÔNG raise exception khi PLC từ chối lệnh (vd sai địa chỉ
+        coil, sai slave id) — nó trả về 1 response object có .isError() =
+        True. Code cũ bỏ qua hoàn toàn giá trị trả về, nên TCP vẫn báo "đã
+        kết nối" trong khi coil thực tế không hề đổi — PLC lặng lẽ từ chối.
+        Đây là nguyên nhân phổ biến nhất của "kết nối được nhưng không đẩy
+        loại": sai coil address (off-by-one) hoặc sai slave/unit id.
+        """
+        try:
+            if self.use_multi:
+                result = await self.client.write_coils(address, [value], slave=self.slave_id)
+            else:
+                result = await self.client.write_coil(address, value, slave=self.slave_id)
+        except Exception as e:
+            log.error("Ghi coil %s (%s, slave=%s) LỖI kết nối: %s",
+                      address, label, self.slave_id, e)
+            return False
+        if result.isError():
+            log.error(
+                "Ghi coil %s (%s, slave=%s) bị PLC TỪ CHỐI: %s — kiểm tra lại "
+                "IOBOX_COIL_* và IOBOX_SLAVE_ID trong .env so với bảng I/O "
+                "thật của tủ điện (rất hay lệch do đánh số coil 0-based vs "
+                "1-based, hoặc sai slave/unit id).",
+                address, label, self.slave_id, result)
+            return False
+        return True
 
     async def start_bang_tai(self):
-        await self.client.write_coil(self.coil_bang_tai, True)
+        if not await self._write_coil(self.coil_bang_tai, True, "băng tải BẬT"):
+            raise RuntimeError(
+                f"PLC từ chối lệnh bật băng tải (coil {self.coil_bang_tai}, "
+                f"slave {self.slave_id}) — xem log để biết chi tiết")
 
     async def stop_bang_tai(self):
-        await self.client.write_coil(self.coil_bang_tai, False)
+        if not await self._write_coil(self.coil_bang_tai, False, "băng tải TẮT"):
+            raise RuntimeError(
+                f"PLC từ chối lệnh tắt băng tải (coil {self.coil_bang_tai}, "
+                f"slave {self.slave_id}) — xem log để biết chi tiết")
 
     async def day_loai_chai(self):
-        await self.client.write_coil(self.coil_day_loai, True)
+        # Không raise ở đây: nếu PLC từ chối, ta VẪN phải lưu đúng trạng thái
+        # chai + ghi log audit ở lớp classify — chỉ cảnh báo thật to trong
+        # console để người vận hành biết cần kiểm tra tay, không để mất luôn
+        # cả bản ghi vì lỗi phần cứng.
+        ok1 = await self._write_coil(self.coil_day_loai, True, "đẩy loại BẬT")
         await asyncio.sleep(self.pulse_width)
-        await self.client.write_coil(self.coil_day_loai, False)
+        ok2 = await self._write_coil(self.coil_day_loai, False, "đẩy loại TẮT")
+        if not (ok1 and ok2):
+            log.error("*** ĐẨY LOẠI CÓ THỂ ĐÃ THẤT BẠI — chai vừa quét có thể "
+                      "CHƯA bị đẩy ra khỏi băng tải, cần kiểm tra tay. ***")
 
     async def is_connected(self) -> bool:
         return bool(self.client.connected)

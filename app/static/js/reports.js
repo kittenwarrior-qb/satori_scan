@@ -23,15 +23,14 @@ async function loadBatches() {
                     <span>${b.ncc_lo}</span>
                     <span>${b.ncc_tsd}</span>
                     <span>${b.ncc_sl}</span>
+                    <span><button class="btn-detail" onclick="viewBatchDetail('${b.so_lo_san_xuat}')">Xem chi tiết</button></span>
                 </div>`).join("")
             : `<div class="table-row" style="padding:16px;color:var(--muted)">Chưa có lô sản xuất</div>`;
     } catch (e) { toast(e.message, "err"); }
 }
 loadBatches();
 
-document.getElementById("btn-search").onclick = async () => {
-    const q = document.getElementById("search-q").value.trim();
-    const field = document.getElementById("search-field").value;
+async function runSearch(q, field) {
     if (!q) { toast("Nhập từ khoá tìm kiếm", "err"); return; }
     try {
         const d = await api(`/api/reports/search?q=${encodeURIComponent(q)}&field=${field}`);
@@ -48,6 +47,20 @@ document.getElementById("btn-search").onclick = async () => {
                 </div>`).join("")
             : `<div class="table-row" style="padding:16px;color:var(--muted)">Không có kết quả</div>`;
     } catch (e) { toast(e.message, "err"); }
+}
+
+document.getElementById("btn-search").onclick = () => {
+    runSearch(document.getElementById("search-q").value.trim(),
+              document.getElementById("search-field").value);
+};
+
+// "Xem chi tiết" trên bảng Báo cáo sản xuất — tra cứu lại theo lô SX (mục
+// 2.3-#2 tài liệu gốc), tái dùng logic tìm kiếm sẵn có.
+window.viewBatchDetail = (soLoSanXuat) => {
+    document.getElementById("search-field").value = "lo_sx";
+    document.getElementById("search-q").value = soLoSanXuat;
+    runSearch(soLoSanXuat, "lo_sx");
+    document.getElementById("search-q").closest(".section-block").scrollIntoView({ behavior: "smooth" });
 };
 
 document.getElementById("btn-export-prod").onclick = async () => {
@@ -180,18 +193,39 @@ let _suppliers = [];
 
 window.closeSupModal = () => document.getElementById("sup-overlay").classList.add("hidden");
 
-document.getElementById("btn-edit-sup").onclick = () => {
+document.getElementById("btn-edit-sup").onclick = async () => {
+    document.getElementById("sup-overlay").classList.remove("hidden");
+
+    // Còn trong phiên đã xác thực (< 3 phút không thao tác) → bỏ qua bước mật khẩu.
+    if (isPasswordUnlocked()) {
+        _suppliers = await api("/api/batches/supplier");
+        if (!_suppliers.length) { toast("Chưa có lô NCC nào", "err"); return; }
+        const sel = document.getElementById("sup-select");
+        sel.innerHTML = _suppliers.map(s =>
+            `<option value="${s.id}">${s.so_lo_ncc} — ${s.nha_cung_cap}</option>`).join("");
+        sel.onchange = fillSupForm;
+        fillSupForm();
+        document.getElementById("sup-step-pw").classList.add("hidden");
+        document.getElementById("sup-step-form").classList.remove("hidden");
+        return;
+    }
+
     document.getElementById("sup-step-pw").classList.remove("hidden");
     document.getElementById("sup-step-form").classList.add("hidden");
     document.getElementById("sup-pw").value = "";
-    document.getElementById("sup-overlay").classList.remove("hidden");
     setTimeout(() => document.getElementById("sup-pw").focus(), 100);
 };
 
 window.supVerifyPw = async () => {
     const pw = document.getElementById("sup-pw").value;
     try {
-        await api(`/api/verify-password?password=${encodeURIComponent(pw)}`, "POST");
+        const r = await fetch("/api/verify-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password: pw }),
+        });
+        if (!r.ok) throw new Error("Mật khẩu không đúng");
+        unlockPassword();
         _suppliers = await api("/api/batches/supplier");
         if (!_suppliers.length) { toast("Chưa có lô NCC nào", "err"); return; }
         const sel = document.getElementById("sup-select");
@@ -216,6 +250,38 @@ function fillSupForm() {
     document.getElementById("sup-sl").value = s.so_luong_chai ?? 0;
     document.getElementById("sup-tsd").value = s.so_lan_tai_su_dung ?? 5;
 }
+
+// ── Dashboard tổng quan ──
+async function loadDashboard() {
+    try {
+        const d = await api("/api/reports/dashboard");
+        document.getElementById("dk-total-bottles").textContent = d.total_bottles;
+        document.getElementById("dk-total-batches").textContent = d.total_batches;
+        document.getElementById("dk-rate").textContent = `${d.ty_le_loi}%`;
+        document.getElementById("dk-cycle").textContent =
+            d.avg_cycle_days == null ? "—" : d.avg_cycle_days;
+
+        drawBarChart(document.getElementById("chart-reuse"),
+            d.by_reuse.map(r => ({ label: r.so_lan, value: r.count })));
+
+        drawDonutChart(document.getElementById("chart-reject"),
+            d.by_reject_reason.map(r => ({ label: r.reason, value: r.count })));
+
+        document.getElementById("dash-sup-rows").innerHTML = d.by_supplier.length
+            ? d.by_supplier.map(s => {
+                const rateCls = s.ty_le_loi >= 10 ? "err" : (s.ty_le_loi > 0 ? "warn" : "ok");
+                return `<div class="table-row sup-grid">
+                    <span>${s.nha_cung_cap}</span>
+                    <span>${s.so_lo_ncc}</span>
+                    <span>${s.tong}</span>
+                    <span>${s.loi}</span>
+                    <span class="badge ${rateCls}">${s.ty_le_loi}%</span>
+                </div>`;
+            }).join("")
+            : `<div class="table-row" style="padding:16px;color:var(--muted)">Chưa có dữ liệu</div>`;
+    } catch (e) { toast(e.message, "err"); }
+}
+loadDashboard();
 
 window.supSave = async () => {
     const id = parseInt(document.getElementById("sup-select").value, 10);

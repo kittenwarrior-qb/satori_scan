@@ -62,6 +62,25 @@ function connectWS(onMessage) {
     open();
 }
 
+// ── Giữ trạng thái mật khẩu quản lý (3 phút kể từ thao tác cuối) ──
+const PW_TTL_MS = 3 * 60 * 1000;
+const PW_KEY = "satori_pw_until";
+
+function isPasswordUnlocked() {
+    const until = parseInt(sessionStorage.getItem(PW_KEY) || "0", 10);
+    return Date.now() < until;
+}
+
+function unlockPassword() {
+    sessionStorage.setItem(PW_KEY, String(Date.now() + PW_TTL_MS));
+}
+
+// Gia hạn khi còn thao tác — nhưng chỉ khi ĐANG unlock (không tự mở khoá từ thao tác thường).
+["mousedown", "keydown", "touchstart"].forEach(evt => {
+    document.addEventListener(evt, () => { if (isPasswordUnlocked()) unlockPassword(); },
+        { passive: true });
+});
+
 // ── API helper ──
 async function api(path, method = "GET", params = {}) {
     const url = new URL(path, location.origin);
@@ -71,3 +90,30 @@ async function api(path, method = "GET", params = {}) {
     if (!r.ok) throw new Error(body.detail || "Lỗi server");
     return body;
 }
+
+// ── Bàn phím ảo Windows (osk.exe) ──────────────────────────────────────────
+let _kbOpen = false;
+
+async function _setKeyboard(open) {
+    try {
+        await fetch(`/api/keyboard/${open ? "open" : "close"}`, { method: "POST" });
+        _kbOpen = open;
+        const btn = document.getElementById("kb-toggle");
+        if (btn) btn.classList.toggle("active", _kbOpen);
+    } catch { /* môi trường không hỗ trợ — im lặng bỏ qua */ }
+}
+
+const kbToggleBtn = document.getElementById("kb-toggle");
+if (kbToggleBtn) kbToggleBtn.onclick = () => _setKeyboard(!_kbOpen);
+
+// Tự động bật khi chạm vào ô nhập liệu (text/search/password/number) — debounce
+// để không gọi liên tục khi Tab qua nhiều ô liền nhau.
+const TEXT_INPUT_TYPES = new Set(["text", "search", "password", "number", "tel"]);
+let _kbDebounce = null;
+document.addEventListener("focusin", e => {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement)) return;
+    if (!TEXT_INPUT_TYPES.has(el.type)) return;
+    clearTimeout(_kbDebounce);
+    _kbDebounce = setTimeout(() => { if (!_kbOpen) _setKeyboard(true); }, 400);
+});

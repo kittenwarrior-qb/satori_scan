@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Chẩn đoán IO-Box{% endblock %}
+{% block header %}CHẨN ĐOÁN IO-BOX{% endblock %}
+{% block content %}
+<div class="reports-page">
+
+  <!-- ═══ Khoá mật khẩu ═══ -->
+  <div id="diag-locked" class="section-block">
+    <div class="section-head"><h3>Yêu cầu mật khẩu quản lý</h3></div>
+    <div class="modal-row" style="max-width:320px">
+      <label>Mật khẩu quản lý</label>
+      <input type="password" id="diag-pw" placeholder="Nhập mật khẩu..." autocomplete="off">
+    </div>
+    <button class="btn-confirm" style="max-width:160px;height:34px" onclick="diagUnlock()">Xác nhận</button>
+  </div>
+
+  <!-- ═══ Nội dung chính (ẩn tới khi nhập đúng mật khẩu) ═══ -->
+  <div id="diag-body" class="hidden">
+
+    <div class="section-block" style="background:#fff3f0;border:1px solid #f3b3a3;border-radius:6px;padding:12px 14px">
+      <b style="color:var(--err)">⚠️ Lưu ý an toàn</b>
+      <p style="margin:6px 0 0;font-size:13px">
+        Trang này sẽ điều khiển xy-lanh đẩy loại THẬT — <b>đảm bảo không có ai đứng gần băng tải/xy-lanh trước khi bấm nút bên dưới.</b>
+      </p>
+    </div>
+
+    <div class="section-block">
+      <div class="section-head"><h3>Bước 1 — Kiểm tra máy IO còn "sống" không</h3></div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 8px">Địa chỉ mạng: <b id="d-host-display">—</b></p>
+      <button class="btn-secondary" onclick="diagProbe()">Kiểm tra kết nối</button>
+      <div id="diag-probe-result" style="margin-top:8px;font-size:13px"></div>
+    </div>
+
+    <div class="section-block">
+      <div class="section-head"><h3>Bước 2 — Dò tìm cách điều khiển đúng</h3></div>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 10px">
+        Không cần hiểu kỹ thuật — bấm nút bên dưới, máy sẽ tự thử 4 cách khác nhau (mỗi lần thử sẽ bật rồi tắt xy-lanh đẩy loại thật, cách nhau ~1 giây).
+        <b>Quan sát xy-lanh trong lúc thử</b> để biết chính xác lần nào nó bung ra.
+      </p>
+      <div class="modal-row" style="max-width:280px">
+        <label>Số hiệu ngõ ra "Đẩy loại" (để nguyên nếu không chắc)</label>
+        <input id="d-address" type="number">
+      </div>
+      <button class="btn-print" style="height:40px;font-size:15px" onclick="diagAutoScan()" id="btn-autoscan">
+        🔧 Bắt đầu dò tìm (4 lần thử, ~10 giây)
+      </button>
+
+      <div id="diag-scan-status" style="margin-top:14px;font-size:13px;color:var(--muted)"></div>
+      <div id="diag-scan-results" style="margin-top:10px;display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+
+    <details class="section-block">
+      <summary style="cursor:pointer;font-weight:700;color:var(--blue);font-size:13px;text-transform:uppercase;letter-spacing:.4px">
+        Tuỳ chỉnh nâng cao (chỉ cần nếu Bước 2 không tìm ra)
+      </summary>
+      <div style="margin-top:12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-width:420px">
+          <div class="modal-row"><label>Host</label><input id="d-host" type="text"></div>
+          <div class="modal-row"><label>Port</label><input id="d-port" type="number"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;max-width:640px">
+          <div class="modal-row"><label>Địa chỉ coil</label><input id="d-address-adv" type="number"></div>
+          <div class="modal-row"><label>Slave / Unit ID</label><input id="d-slave" type="number"></div>
+          <div class="modal-row">
+            <label>Cách ghi</label>
+            <select id="d-mode">
+              <option value="single">FC 0x05 — Write Single Coil</option>
+              <option value="multi">FC 0x0F — Write Multiple Coils</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px">
+          <button class="btn-secondary" onclick="diagFillCoil('bang_tai')">Điền địa chỉ coil Băng tải</button>
+          <button class="btn-secondary" onclick="diagFillCoil('day_loai')">Điền địa chỉ coil Đẩy loại</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+          <button class="btn-start" style="width:auto;padding:0 16px;height:36px" onclick="diagWriteCoil(true)">Ghi coil = BẬT</button>
+          <button class="btn-secondary" style="height:36px;color:var(--err);border-color:var(--err)" onclick="diagWriteCoil(false)">Ghi coil = TẮT</button>
+          <button class="btn-print" style="height:36px" onclick="diagPulse()">Test xung Đẩy loại (bật → giữ → tắt)</button>
+        </div>
+        <div id="diag-result" style="margin-top:10px;font-size:13px;padding:12px;border-radius:6px;background:var(--panel-bg);border:1px solid var(--border-lt)">
+          Chưa thử lệnh nào.
+        </div>
+        <p style="font-size:12px;color:var(--muted);margin:10px 0 8px">Lưu thủ công 1 giá trị vào .env (không khởi động lại thì chưa áp dụng):</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn-secondary" onclick="diagSaveEnv('IOBOX_SLAVE_ID', document.getElementById('d-slave').value)">Lưu Slave ID này</button>
+          <button class="btn-secondary" onclick="diagSaveEnv('IOBOX_COIL_DAY_LOAI', document.getElementById('d-address-adv').value)">Lưu địa chỉ coil này là "Đẩy loại"</button>
+          <button class="btn-secondary" onclick="diagSaveEnv('IOBOX_COIL_BANG_TAI', document.getElementById('d-address-adv').value)">Lưu địa chỉ coil này là "Băng tải"</button>
+        </div>
+      </div>
+    </details>
+
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/diag.js"></script>
+{% endblock %}

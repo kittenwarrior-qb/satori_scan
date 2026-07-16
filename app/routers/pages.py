@@ -31,3 +31,8 @@ def reject_page(request: Request):
 @router.get("/reports")
 def reports_page(request: Request):
     return templates.TemplateResponse(request, "reports.html")
+
+
+@router.get("/diag")
+def diag_page(request: Request):
+    return templates.TemplateResponse(request, "diag.html")

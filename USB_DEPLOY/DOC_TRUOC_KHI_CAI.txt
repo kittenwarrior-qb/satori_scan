@@ -1,0 +1,170 @@
+﻿﻿SATORI v2 — GÓI CÀI ĐẶT (copy vào USB → chép sang máy tủ PC/PLC)
+====================================================================
+
+TRONG THƯ MỤC NÀY CÓ GÌ
+--------------------------------------------------------------------
+satori.exe   -> chương trình chính (đã build bản mới nhất, có đủ các
+                bản sửa lỗi tính đến 14/07/2026 — kể cả fix "giao diện
+                cũ do cache", fix "đẩy loại không hoạt động", fix rò rỉ
+                mật khẩu ra console log, fix "kết thúc ca báo lỗi
+                nhưng ca đã kết thúc trong DB", và trang chẩn đoán
+                IO-Box mới tại /diag — xem mục riêng bên dưới)
+.env         -> file cấu hình: IP scanner/IO-Box/laser, mật khẩu quản
+                lý, coil ModBus... (đang trỏ tới thiết bị thật)
+docs\        -> hướng dẫn sử dụng (PDF + Word) và báo cáo kiểm tra
+                giao diện
+
+KHÔNG có "data" đi kèm — chương trình tự tạo khi chạy lần đầu (database
+rỗng, thư mục reports/backups rỗng). Nếu máy tủ PC đã có dữ liệu cũ từ
+trước (bản CodeIT cũ hoặc bản satori-v2 cũ), ĐỌC KỸ mục 4 bên dưới
+trước khi ghi đè.
+
+
+CÁC BƯỚC CÀI ĐẶT
+--------------------------------------------------------------------
+1. Chép TOÀN BỘ thư mục này (satori.exe + .env + docs) vào 1 thư mục
+   cố định trên máy tủ PC, ví dụ:
+       C:\SATORI\
+
+2. Kiểm tra lại file .env bằng Notepad — đối chiếu đúng IP thật của
+   scanner / IO-Box / laser tại vị trí lắp đặt (SCANNER_HOSTS,
+   IOBOX_HOST, LASER_HOST). Nếu khác với IP đã ghi sẵn, sửa lại rồi lưu.
+
+3. Double-click C:\SATORI\satori.exe
+   - Cửa sổ console đen hiện ra (log hệ thống) — ĐỪNG tắt cửa sổ này,
+     đó là server đang chạy.
+   - Trình duyệt tự mở toàn màn hình (kiosk), hiện màn hình bắt đầu
+     SATORI.
+   - Kiểm tra bảng "Trạng thái thiết bị" ở cuối trang: Scanner /
+     IO-Box / Laser phải hiện "Đã kết nối". Nếu có thiết bị "Mất kết
+     nối", kiểm tra lại dây mạng/IP ở bước 2.
+
+4. NẾU máy đã có dữ liệu cũ cần giữ lại:
+   - Tìm thư mục "data" của bản cũ (thường nằm cạnh file .exe cũ).
+   - Copy nguyên thư mục "data" đó vào cạnh satori.exe MỚI (ghi đè)
+     TRƯỚC KHI chạy lần đầu.
+   - Nếu không chắc, SAO LƯU thư mục "data" cũ ra USB riêng trước khi
+     làm bất cứ gì.
+
+5. Cho chương trình tự khởi động cùng Windows (khuyến nghị):
+   - Nhấn Windows + R, gõ: shell:startup, Enter.
+   - Tạo shortcut của C:\SATORI\satori.exe vào thư mục vừa mở.
+   - Khởi động lại máy để kiểm tra tự chạy đúng.
+
+6. Đọc "docs\HuongDanSuDung_SATORI_v2.pdf" để biết cách thao tác 3
+   màn hình chính (Định danh — Phân loại — Quản lý & Báo cáo).
+
+
+SAO LƯU DỮ LIỆU
+--------------------------------------------------------------------
+- Hệ thống tự sao lưu database định kỳ vào data\backups\.
+- Có thể bấm "Sao lưu DB" ngay trên màn hình Báo cáo bất cứ lúc nào.
+- Nên định kỳ copy thư mục "data" ra ổ ngoài/máy chủ khác — đây là
+  toàn bộ dữ liệu sản xuất, KHÔNG được để mất.
+
+
+NẾU CẦN ĐỔI SANG CHẾ ĐỘ GIẢ LẬP (không có thiết bị thật, để test)
+--------------------------------------------------------------------
+Mở .env bằng Notepad, sửa dòng:
+    USE_MOCK_DEVICES=false
+thành:
+    USE_MOCK_DEVICES=true
+rồi lưu và chạy lại satori.exe. Nhớ đổi lại "false" trước khi vận
+hành thật.
+
+
+MẬT KHẨU QUẢN LÝ
+--------------------------------------------------------------------
+Xem trực tiếp trong file .env, dòng ADMIN_PASSWORD — chỉ người có
+trách nhiệm mới nên mở file này. Đổi được bất cứ lúc nào, chỉ cần sửa
+giá trị rồi lưu + chạy lại satori.exe.
+
+
+CẬP NHẬT LÊN BẢN satori.exe MỚI (rất quan trọng — đọc kỹ)
+--------------------------------------------------------------------
+Mỗi lần thay satori.exe bằng bản mới trên CÙNG 1 máy, PHẢI làm đủ 2
+bước sau, không là vẫn thấy giao diện/hành vi CŨ dù đã copy file MỚI
+đè lên:
+
+1. Đóng hẳn bản đang chạy trước khi thay file:
+   - Mở Task Manager (Ctrl+Shift+Esc) → tab "Details"/"Chi tiết".
+   - Tìm và "End task" TẤT CẢ tiến trình "satori.exe".
+   - Tìm và "End task" luôn cửa sổ trình duyệt kiosk đang mở (thường
+     là "chrome.exe" hoặc "msedge.exe") — đóng bằng nút X thường KHÔNG
+     đủ, phải End task hẳn trong Task Manager.
+   - Chỉ khi Task Manager không còn "satori.exe" nào mới copy đè file
+     mới vào.
+
+2. Chạy lại satori.exe MỚI — cửa sổ kiosk mở lại sẽ tự tải giao diện
+   mới hoàn toàn (bản 13/07/2026 trở đi mỗi lần chạy đều mở bằng 1
+   profile trình duyệt HOÀN TOÀN MỚI, không còn khái niệm cache cũ
+   nữa — không cần xoá cache thủ công, không cần End task cửa sổ
+   trình duyệt cũ nữa, chỉ cần tắt satori.exe cũ).
+
+Cách nhận biết đang chạy nhầm bản cũ: mở cửa sổ console đen (log) của
+satori.exe — nếu Windows báo lỗi "port đang được sử dụng" hoặc bạn
+thấy 2 cửa sổ console cùng lúc, tức là có bản cũ chưa tắt hẳn.
+
+
+MÁY ĐẨY BÌNH LỖI KHÔNG HOẠT ĐỘNG DÙ IO-BOX BÁO "ĐÃ KẾT NỐI"
+--------------------------------------------------------------------
+Đây là lỗi đã tìm ra và sửa trong bản 13/07/2026: trước đây phần mềm
+gửi lệnh đẩy loại qua ModBus nhưng KHÔNG kiểm tra PLC có chấp nhận
+lệnh hay không — nếu sai địa chỉ coil hoặc sai "slave id", PLC âm thầm
+từ chối, TCP vẫn báo "Đã kết nối" như bình thường, và bình lỗi không
+bị đẩy ra. Bản mới đã:
+
+  - Kiểm tra phản hồi từ PLC sau mỗi lệnh ghi coil.
+  - In rõ vào cửa sổ console dòng "*** ĐẨY LOẠI CÓ THỂ ĐÃ THẤT BẠI ***"
+    kèm lý do, mỗi khi PLC từ chối lệnh — trước đây lỗi này HOÀN TOÀN
+    IM LẶNG, không có cách nào biết.
+
+Nếu sau khi cập nhật bản mới, console vẫn in ra "bị PLC TỪ CHỐI" — DÙNG
+TRANG CHẨN ĐOÁN (KHÔNG cần biết ModBus là gì, chỉ cần bấm nút và quan sát
+xy-lanh):
+
+  1. Mở trình duyệt tới http://127.0.0.1:8000/diag (đứng ngay tại máy
+     tủ PC, hoặc gõ /diag vào thanh địa chỉ nếu đang ở chế độ kiosk).
+     Nhập mật khẩu quản lý.
+  2. ⚠️ Đảm bảo không có ai đứng gần băng tải/xy-lanh trước khi bấm bất
+     kỳ nút nào — trang này điều khiển phần cứng thật ngay lập tức.
+  3. Bấm "Kiểm tra kết nối" (Bước 1) để chắc chắn máy IO còn sống.
+  4. Bấm nút to "🔧 Bắt đầu dò tìm" (Bước 2) — hệ thống tự thử 4 cách
+     khác nhau, mỗi cách đều bật rồi tắt xy-lanh thật, cách nhau ~1 giây.
+     CHỈ VIỆC ĐỨNG NHÌN xy-lanh trong lúc máy thử.
+  5. Xong 4 lần thử (khoảng 10 giây), màn hình liệt kê lại từng lần —
+     lần nào bạn thấy xy-lanh thực sự bung ra thì bấm nút xanh "Có,
+     xy-lanh đã bung — Lưu cách này" ngay dưới lần thử đó. Hệ thống tự
+     lưu vào .env, không cần mở Notepad.
+  6. Khởi động lại satori.exe 1 lần cuối để áp dụng cho ca sản xuất thật.
+  7. Nếu cả 4 lần thử đều không thấy xy-lanh phản ứng dù có lần "PLC
+     đồng ý" (nghĩa là PLC nhận lệnh nhưng vật lý không bung) — thử đổi
+     số ở ô "Số hiệu ngõ ra Đẩy loại" (Bước 2) sang giá trị khác rồi bấm
+     dò tìm lại; số này lấy theo bảng I/O tủ điện thật.
+  8. Nếu đã thử hết vẫn không được, khả năng cao là vấn đề phần cứng
+     (van khí/xy-lanh không có áp suất, dây tín hiệu lỏng) — cần thợ
+     điện kiểm tra tủ điện trực tiếp, không còn là lỗi phần mềm nữa.
+
+(Mục "Tuỳ chỉnh nâng cao" ở cuối trang /diag — có Slave ID, địa chỉ coil,
+FC 0x05/0x0F — chỉ dành cho ai hiểu ModBus muốn tự tay chỉnh, KHÔNG cần
+dùng tới nếu bước dò tìm tự động ở trên đã ra kết quả.)
+
+
+CÁC LỖI KHÁC ĐÃ SỬA TRONG BẢN 13/07/2026 (đợt rà soát lần 2)
+--------------------------------------------------------------------
+- Mật khẩu quản lý trước đây bị in nguyên văn vào cửa sổ console mỗi
+  lần xác thực (vd "POST /api/verify-password?password=stradmin") —
+  vì cửa sổ console luôn phải mở để theo dõi log, ai đứng gần máy cũng
+  đọc được mật khẩu. Đã sửa: mật khẩu không còn xuất hiện trong log
+  dưới bất kỳ hình thức nào.
+- "Kết thúc sản xuất" ở màn Phân loại: nếu PLC từ chối lệnh tắt băng
+  tải, trước đây màn hình báo lỗi trong khi ca ĐÃ kết thúc trong dữ
+  liệu — gây hiểu lầm ca chưa kết thúc. Giờ báo đúng: ca kết thúc bình
+  thường + cảnh báo riêng "chưa tắt được băng tải, tắt tay" nếu có sự
+  cố phần cứng.
+- Quét chai vừa Định danh trong CÙNG NGÀY bên màn Phân loại trước đây
+  bị báo nhầm "Mã chai đã được cập nhật" thay vì "Hợp lệ".
+- Thao tác ở màn Loại bỏ thủ công trong lúc ca Phân loại đang chạy bị
+  lẫn nhầm vào danh sách "đã quét" hiển thị trên màn Phân loại.
+- Màn Định danh trước đây không khôi phục danh sách mã đã in nếu tải
+  lại trang giữa ca (màn Phân loại đã có sẵn, giờ Định danh cũng có).

@@ -169,12 +169,34 @@ def log_event(db: Session, **kwargs):
     return e
 
 
-def list_scan_events_for_session(db: Session, session_id: int, limit: int = 200):
-    """N sự kiện quét mới nhất của 1 ca (mới → cũ). Dùng để nạp lại màn hình
-    phân loại sau khi chuyển tab."""
+def list_print_events_for_session(db: Session, session_id: int, limit: int = 200):
+    """N sự kiện IN mã mới nhất của 1 ca Định danh (mới → cũ). Dùng để nạp lại
+    màn hình Định danh sau khi tải lại trang/chuyển tab giữa ca — trước đây
+    màn này không có hàm tương đương nên refresh giữa ca sẽ mất hết danh sách
+    hiển thị (dữ liệu vẫn còn trong DB, chỉ là không hiện lại trên UI)."""
     return (
         db.query(models.ScanEvent)
-        .filter(models.ScanEvent.session_id == session_id)
+        .filter(models.ScanEvent.session_id == session_id,
+                models.ScanEvent.event_type == "PRINT")
+        .order_by(models.ScanEvent.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def list_scan_events_for_session(db: Session, session_id: int, limit: int = 200):
+    """N sự kiện quét mới nhất của 1 ca (mới → cũ). Dùng để nạp lại màn hình
+    phân loại sau khi chuyển tab.
+
+    CHỈ lấy event_type="SCAN": nếu công nhân dùng màn "Loại bỏ thủ công"
+    trong lúc ca Phân loại vẫn đang chạy, sự kiện REJECT đó vẫn tính vào
+    thống kê lỗi của ca (đúng nghiệp vụ) nhưng KHÔNG được lẫn vào danh sách
+    "đã quét" hiển thị trên màn Phân loại — 2 việc khác nhau.
+    """
+    return (
+        db.query(models.ScanEvent)
+        .filter(models.ScanEvent.session_id == session_id,
+                models.ScanEvent.event_type == "SCAN")
         .order_by(models.ScanEvent.id.desc())
         .limit(limit)
         .all()

@@ -88,11 +88,21 @@
 
     window.openBatchModal = function (onSaved) {
         _onSaved = onSaved || null;
+        document.getElementById("bm-overlay").classList.remove("hidden");
+
+        // Còn trong phiên đã xác thực (< 3 phút không thao tác) → bỏ qua bước mật khẩu.
+        if (isPasswordUnlocked()) {
+            document.getElementById("bm-step-pw").classList.add("hidden");
+            bmLoadSuppliers().then(() => {
+                document.getElementById("bm-step-form").classList.remove("hidden");
+            });
+            return;
+        }
+
         // Reset về bước nhập pw
         document.getElementById("bm-step-pw").classList.remove("hidden");
         document.getElementById("bm-step-form").classList.add("hidden");
         document.getElementById("bm-pw").value = "";
-        document.getElementById("bm-overlay").classList.remove("hidden");
         setTimeout(() => document.getElementById("bm-pw").focus(), 100);
     };
 
@@ -103,7 +113,13 @@
     window.bmVerifyPw = async function () {
         const pw = document.getElementById("bm-pw").value;
         try {
-            await api(`/api/verify-password?password=${encodeURIComponent(pw)}`, "POST");
+            const r = await fetch("/api/verify-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: pw }),
+            });
+            if (!r.ok) throw new Error("Mật khẩu không đúng");
+            unlockPassword();
             // Mật khẩu đúng → load danh sách lô NCC và hiện form
             document.getElementById("bm-step-pw").classList.add("hidden");
             await bmLoadSuppliers();

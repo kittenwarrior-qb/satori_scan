@@ -13,12 +13,13 @@ for _stream in (sys.stdout, sys.stderr):
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from app.database import crud
 from app.database.connection import SessionLocal
 from app.devices.manager import device_manager
 from app.paths import STATIC_DIR
-from app.routers import batches, classify, identify, pages, reports, sessions
+from app.routers import batches, classify, diagnostics, identify, keyboard, pages, reports, sessions
 from app.services.classify import classify_bottle
 from app.services.identify import identify_new_bottle
 from app.ws import ws_manager
@@ -125,8 +126,23 @@ async def lifespan(app: FastAPI):
     await device_manager.stop_scanners()
 
 
+class NoCacheStaticFiles(StaticFiles):
+    """Ép trình duyệt luôn kiểm tra lại (revalidate) file JS/CSS/ảnh.
+
+    Máy kiosk chạy đúng 1 URL cố định (http://127.0.0.1:PORT) qua nhiều lần
+    build .exe khác nhau — nếu để browser cache mặc định, bản .exe mới thay
+    thế xong nhưng UI vẫn hiện code cũ do trình duyệt không tải lại file
+    tĩnh. no-store buộc tải lại mỗi lần, chấp nhận đánh đổi hiệu năng nhỏ
+    vì đây là ứng dụng nội bộ chạy trên localhost, không phải web công khai.
+    """
+    async def get_response(self, path: str, scope: Scope):
+        response = await super().get_response(path, scope)
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+        return response
+
+
 app = FastAPI(title="SATORI v2", lifespan=lifespan)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 app.include_router(pages.router)
 app.include_router(sessions.router, prefix="/api")
@@ -134,6 +150,8 @@ app.include_router(classify.router, prefix="/api")
 app.include_router(identify.router, prefix="/api")
 app.include_router(reports.router, prefix="/api")
 app.include_router(batches.router, prefix="/api")
+app.include_router(keyboard.router, prefix="/api")
+app.include_router(diagnostics.router, prefix="/api")
 
 
 @app.get("/api/health")

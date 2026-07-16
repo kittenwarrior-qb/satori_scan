@@ -1,5 +1,6 @@
 """Xuất báo cáo Excel (tương thích format CodeIT cũ) + báo cáo theo ca/ngày."""
 import os
+from collections import defaultdict
 from datetime import datetime, time, timedelta
 from typing import Dict, Optional
 
@@ -191,6 +192,87 @@ def export_batch_detail(db: Session, so_lo_san_xuat: str) -> Optional[str]:
     path = os.path.join(REPORT_DIR, f"{safe}.xlsx")
     wb.save(path)
     return path
+
+
+def dashboard_summary(db: Session) -> dict:
+    """Số liệu tổng quan cho dashboard biểu đồ ở màn Quản lý & Báo cáo.
+
+    "Thời gian xoay vòng trung bình" là ƯỚC TÍNH dựa trên khoảng cách giữa
+    các lần quét OK liên tiếp (+ từ lúc định danh tới lần quét OK đầu tiên)
+    của cùng 1 mã chai — hệ thống không lưu vị trí/hành trình thực tế nên
+    đây chỉ là xấp xỉ, không phải số đo chính xác như hệ thống warehouse.
+    """
+    total_bottles = db.query(models.Bottle).count()
+    total_batches = db.query(models.ProductionBatch).count()
+    total_rejected = (db.query(models.Bottle)
+                      .filter(models.Bottle.trang_thai < 0).count())
+    ty_le_loi = round(total_rejected / total_bottles * 100, 1) if total_bottles else 0
+
+    # ── Phân bố theo số lần tái sử dụng thực tế ──
+    reuse_rows = (db.query(models.Bottle.so_lan_thuc_te, func.count())
+                  .group_by(models.Bottle.so_lan_thuc_te)
+                  .order_by(models.Bottle.so_lan_thuc_te).all())
+    by_reuse = [{"so_lan": n if n is not None else 0, "count": c}
+                for n, c in reuse_rows]
+
+    # ── Lý do loại ──
+    reason_rows = (db.query(models.Bottle.trang_thai, func.count())
+                   .filter(models.Bottle.trang_thai < 0)
+                   .group_by(models.Bottle.trang_thai).all())
+    by_reject_reason = [
+        {"reason": models.REJECT_REASONS.get(tt, f"Khác ({tt})"), "count": c}
+        for tt, c in reason_rows
+    ]
+
+    # ── Theo từng NCC ──
+    by_supplier = []
+    for sup in db.query(models.SupplierBatch).all():
+        tong = (db.query(models.Bottle)
+                .filter(models.Bottle.supplier_batch_id == sup.id).count())
+        if tong == 0:
+            continue
+        loi = (db.query(models.Bottle)
+               .filter(models.Bottle.supplier_batch_id == sup.id,
+                       models.Bottle.trang_thai < 0).count())
+        by_supplier.append({
+            "nha_cung_cap": sup.nha_cung_cap, "so_lo_ncc": sup.so_lo_ncc,
+            "tong": tong, "loi": loi,
+            "ty_le_loi": round(loi / tong * 100, 1) if tong else 0,
+        })
+
+    # ── Thời gian xoay vòng trung bình (ước tính) ──
+    created_at_by_ma = dict(
+        db.query(models.Bottle.ma_chai, models.Bottle.created_at).all())
+    scan_rows = (db.query(models.ScanEvent.ma_chai, models.ScanEvent.scanned_at)
+                 .filter(models.ScanEvent.event_type == "SCAN",
+                         models.ScanEvent.ket_qua == "OK")
+                 .order_by(models.ScanEvent.ma_chai, models.ScanEvent.scanned_at)
+                 .all())
+    grouped: Dict[str, list] = defaultdict(list)
+    for ma, ts in scan_rows:
+        if ts:
+            grouped[ma].append(ts)
+
+    deltas = []
+    for ma, timestamps in grouped.items():
+        prev = created_at_by_ma.get(ma)
+        for ts in timestamps:
+            if prev:
+                deltas.append((ts - prev).total_seconds())
+            prev = ts
+
+    avg_cycle_days = round(sum(deltas) / len(deltas) / 86400, 1) if deltas else None
+
+    return {
+        "total_bottles": total_bottles,
+        "total_batches": total_batches,
+        "total_rejected": total_rejected,
+        "ty_le_loi": ty_le_loi,
+        "by_reuse": by_reuse,
+        "by_reject_reason": by_reject_reason,
+        "by_supplier": by_supplier,
+        "avg_cycle_days": avg_cycle_days,
+    }
 
 
 def _tt_label(v) -> str:

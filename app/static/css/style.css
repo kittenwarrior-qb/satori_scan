@@ -88,6 +88,17 @@ button { cursor: pointer; font-family: inherit; }
 }
 #clock { font-weight: 700; color: var(--text); font-size: 14px; font-variant-numeric: tabular-nums; }
 
+.kb-toggle-btn {
+  width: 30px; height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--muted);
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+}
+.kb-toggle-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
 /* ── Main wrapper ── */
 main {
   flex: 1;
@@ -418,9 +429,24 @@ main {
 .classify-grid { grid-template-columns: 32px 2fr 1.2fr 0.8fr 0.8fr 1fr; }
 .identify-grid { grid-template-columns: 36px 2.2fr 1.2fr; }
 .reject-grid   { grid-template-columns: 36px 2fr 1.2fr 1.3fr; }
-.batch-grid    { grid-template-columns: 1.4fr 1fr .8fr 1.4fr .8fr .8fr; }
+.batch-grid    { grid-template-columns: 1.4fr 1fr .8fr 1.4fr .8fr .8fr 1fr; }
 .result-grid   { grid-template-columns: 1.2fr 1.2fr 1.5fr 1fr 1fr 1fr; }
 .shift-grid    { grid-template-columns: 1.1fr 1fr 1.3fr 1fr .8fr .8fr 1fr; }
+.sup-grid      { grid-template-columns: 1.4fr 1.4fr .9fr .7fr .9fr; }
+
+/* ── Dashboard (Quản lý & Báo cáo) ── */
+.dash-kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.dash-kpi {
+  flex: 1; min-width: 140px;
+  background: var(--panel-bg); border: 1px solid var(--border-lt); border-radius: 8px;
+  padding: 10px 14px; display: flex; flex-direction: column; gap: 4px;
+}
+.dash-kpi-val { font-size: 24px; font-weight: 800; color: var(--blue); }
+.dash-kpi-label { font-size: 11px; color: var(--muted); }
+.dash-charts { display: flex; gap: 16px; margin-bottom: 14px; flex-wrap: wrap; }
+.dash-chart-box { flex: 1; min-width: 320px; background: var(--panel); border: 1px solid var(--border-lt); border-radius: 8px; padding: 10px; }
+.dash-chart-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+.btn-detail { font-size: 11px; padding: 3px 10px; border: 1px solid var(--blue); color: var(--blue); background: #fff; border-radius: 5px; }
 
 .table-head {
   background: var(--blue);       /* #166C94 */

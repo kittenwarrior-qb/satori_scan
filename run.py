@@ -1,8 +1,11 @@
 """Điểm khởi động khi đóng gói .exe — chạy server + mở kiosk fullscreen."""
+import glob
 import os
 import subprocess
+import tempfile
 import threading
 import time
+import uuid
 import webbrowser
 
 import uvicorn
@@ -18,6 +21,23 @@ def start_server():
         port=settings.web_port,
         log_level="info",
     )
+
+
+def _fresh_profile_dir() -> str:
+    """Thư mục profile Chrome/Edge MỚI TINH cho mỗi lần chạy — không có
+    cache cũ từ trước, nên mỗi lần đổi bản .exe, kiosk luôn tải đúng bản
+    JS/CSS mới nhất mà không cần xoá cache tay. Dọn profile của các lần
+    chạy trước (best-effort) để không tích rác trong thư mục temp."""
+    base = os.path.join(tempfile.gettempdir(), "satori_kiosk")
+    for old in glob.glob(base + "_*"):
+        try:
+            import shutil
+            shutil.rmtree(old, ignore_errors=True)
+        except Exception:
+            pass
+    profile = f"{base}_{uuid.uuid4().hex[:8]}"
+    os.makedirs(profile, exist_ok=True)
+    return profile
 
 
 def open_kiosk():
@@ -39,6 +59,8 @@ def open_kiosk():
         subprocess.Popen([
             browser,
             f"--app={url}",
+            f"--user-data-dir={_fresh_profile_dir()}",  # profile mới -> không cache cũ
+            "--no-first-run",
             "--start-maximized",        # phóng to gần kín màn hình
             "--force-device-scale-factor=1",  # không để Chrome tự zoom
             "--disable-pinch",          # tắt zoom cảm ứng

@@ -24,6 +24,12 @@ def _parse_date(s: Optional[str]):
         return None
 
 
+@router.get("/reports/dashboard")
+def dashboard(db: Session = Depends(get_db)):
+    """Số liệu tổng quan cho dashboard biểu đồ."""
+    return report_svc.dashboard_summary(db)
+
+
 @router.get("/reports/batches")
 def batches(db: Session = Depends(get_db)):
     """Bảng tổng hợp tất cả lô SX."""

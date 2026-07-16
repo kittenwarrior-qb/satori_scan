@@ -6,6 +6,36 @@
 
     <div class="section-block">
         <div class="section-head">
+            <h3>Dashboard tổng quan</h3>
+        </div>
+        <div class="dash-kpis">
+            <div class="dash-kpi"><span class="dash-kpi-val" id="dk-total-bottles">0</span><span class="dash-kpi-label">Tổng số chai</span></div>
+            <div class="dash-kpi"><span class="dash-kpi-val" id="dk-total-batches">0</span><span class="dash-kpi-label">Tổng lô SX</span></div>
+            <div class="dash-kpi"><span class="dash-kpi-val" id="dk-rate">0%</span><span class="dash-kpi-label">Tỉ lệ lỗi chung</span></div>
+            <div class="dash-kpi" title="Ước tính từ khoảng cách giữa các lần quét OK liên tiếp của cùng 1 mã chai — không phải số đo chính xác vị trí/hành trình thực tế">
+                <span class="dash-kpi-val" id="dk-cycle">—</span><span class="dash-kpi-label">Thời gian xoay vòng TB (ước tính, ngày)</span>
+            </div>
+        </div>
+        <div class="dash-charts">
+            <div class="dash-chart-box">
+                <div class="dash-chart-title">Phân bố theo số lần tái sử dụng thực tế</div>
+                <canvas id="chart-reuse" style="width:100%;height:220px"></canvas>
+            </div>
+            <div class="dash-chart-box">
+                <div class="dash-chart-title">Tỉ lệ hư hỏng theo lý do loại</div>
+                <canvas id="chart-reject" style="width:100%;height:220px"></canvas>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <div class="table-head sup-grid">
+                <span>Nhà cung cấp</span><span>Lô NCC</span><span>Tổng chai</span><span>Lỗi</span><span>Tỉ lệ lỗi</span>
+            </div>
+            <div id="dash-sup-rows" class="table-body short"></div>
+        </div>
+    </div>
+
+    <div class="section-block">
+        <div class="section-head">
             <h3>Báo cáo sản xuất</h3>
             <div style="display:flex;gap:8px">
                 <button id="btn-backup" class="btn-secondary">&#128190; Sao lưu DB</button>
@@ -16,7 +46,7 @@
         <div class="table-wrap">
             <div class="table-head batch-grid">
                 <span>Lô SX</span><span>Ngày SX</span><span>SL chai</span>
-                <span>NCC: Lô</span><span>NCC: TSD</span><span>NCC: SL</span>
+                <span>NCC: Lô</span><span>NCC: TSD</span><span>NCC: SL</span><span>Thao tác</span>
             </div>
             <div id="batch-rows" class="table-body short"></div>
         </div>
@@ -173,5 +203,6 @@
 
 {% endblock %}
 {% block scripts %}
+<script src="/static/js/charts.js"></script>
 <script src="/static/js/reports.js"></script>
 {% endblock %}

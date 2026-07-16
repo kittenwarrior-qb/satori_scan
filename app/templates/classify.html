@@ -9,7 +9,7 @@
     <div class="info-block-header">
       <span>Thông tin chung</span>
       <button class="btn-print" style="height:24px;padding:0 12px;font-size:11px"
-              onclick="openBatchModal(function(b){loadActiveInfo();})">Cập nhật lô SX</button>
+              onclick="openBatchModal(function(b){showBatchInfo(b); toast('Đã chọn lô: ' + b.so_lo_san_xuat, 'ok');})">Cập nhật lô SX</button>
     </div>
     <div class="info-fields" style="grid-template-columns:1fr 1fr">
       <div class="info-field"><label>Số lô sản xuất:</label><span class="fval" id="lo-sx">—</span></div>
@@ -86,9 +86,10 @@
 
   <!-- ══ ACTION BAR ══ -->
   <div class="action-bar">
-    <button id="btn-start" class="btn-act-ok">&#9654; Bắt đầu</button>
+    <button id="btn-start" class="btn-act-ok" disabled>&#9654; Bắt đầu</button>
     <button id="btn-end" class="btn-act-stop" disabled>&#9632; Kết thúc sản xuất</button>
     <div id="session-status" class="session-pill session-idle">&#9679; Chưa bắt đầu</div>
+    <span id="no-batch-hint" style="font-size:12px;color:var(--muted)">Chưa có lô sản xuất — bấm "Cập nhật lô SX"</span>
     <div class="spacer"></div>
     <a href="/reject" class="btn-act-link">Loại bỏ thủ công</a>
   </div>

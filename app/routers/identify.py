@@ -34,6 +34,27 @@ def list_batches(db: Session = Depends(get_db)):
     return out
 
 
+@router.get("/identify/prints")
+def list_prints(limit: int = 200, db: Session = Depends(get_db)):
+    """Nạp lại danh sách mã đã in của ca ĐỊNH DANH đang chạy — khôi phục màn
+    hình sau khi tải lại trang/chuyển tab (giống /classify/scans)."""
+    sess = crud.get_active_session(db, "DINH_DANH")
+    if not sess:
+        return {"active": False, "prints": [], "tong_hop_le": 0, "count": 0}
+
+    prints = [{
+        "ma_chai": e.ma_chai,
+        "scanned_at": e.scanned_at.isoformat() if e.scanned_at else None,
+    } for e in crud.list_print_events_for_session(db, sess.id, limit)]
+
+    return {
+        "active": True,
+        "prints": prints,
+        "tong_hop_le": sess.tong_hop_le,
+        "count": sess.tong_hop_le,
+    }
+
+
 @router.post("/identify/print")
 async def print_one(production_batch_id: int, db: Session = Depends(get_db)):
     """In mã cho 1 chai mới. Broadcast kết quả qua WebSocket."""

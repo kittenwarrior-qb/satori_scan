@@ -15,6 +15,14 @@ class Settings(BaseSettings):
 
     iobox_host: str = "192.168.1.50"
     iobox_port: int = 502
+    # Modbus slave/unit id của IO-Box. Rất nhiều thiết bị IO-Box/PLC dùng "1"
+    # làm mặc định (không phải "0") — sai giá trị này khiến lệnh ghi coil bị
+    # PLC từ chối trong im lặng: TCP vẫn "Đã kết nối" nhưng coil không đổi.
+    iobox_slave_id: int = 1
+    # "single" = Write Single Coil (FC 0x05, mặc định) | "multi" = Write
+    # Multiple Coils (FC 0x0F) — một số IO-Box giá rẻ chỉ hỗ trợ FC 0x0F.
+    # Trang /diag dò tự động ra giá trị đúng và lưu vào đây giúp.
+    iobox_write_mode: str = "single"
     laser_host: str = "192.168.1.60"
     laser_port: int = 9100
 

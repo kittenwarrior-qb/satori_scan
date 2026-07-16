@@ -68,6 +68,31 @@ async function showQR(ma) {
     } catch {}
 }
 
+// Nạp lại danh sách mã đã in của ca đang chạy (sau khi tải lại trang/chuyển
+// tab quay lại) — dữ liệu luôn được ghi đúng vào DB dù màn hình có bị mất
+// hiển thị hay không; hàm này chỉ đồng bộ lại UI cho khớp với DB.
+async function restorePrints() {
+    try {
+        const d = await api("/api/identify/prints", "GET", { limit: 200 });
+        if (!d.active) return;
+        count = d.count; ok = d.tong_hop_le;
+        document.getElementById("count").textContent = count;
+        document.getElementById("stat-ok").textContent = ok;
+        const rowsEl = document.getElementById("rows");
+        let n = count;
+        for (const p of d.prints) {  // mới → cũ, giữ thứ tự mới nhất trên cùng
+            const ts = p.scanned_at ? new Date(p.scanned_at).toLocaleTimeString("vi-VN") : "—";
+            const row = document.createElement("div");
+            row.className = "table-row identify-grid ok";
+            row.innerHTML = `<span>${n}</span><span>${p.ma_chai}</span><span>${ts}</span>`;
+            rowsEl.appendChild(row);
+            n--;
+        }
+        if (d.prints.length) showQR(d.prints[0].ma_chai);
+    } catch {}
+}
+restorePrints();
+
 // Xóa sạch dữ liệu hiển thị (data ca đã lưu DB) — về trạng thái trống.
 function clearScreen() {
     count = 0; ok = 0; err = 0;

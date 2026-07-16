@@ -82,6 +82,7 @@ async def classify_bottle(db: Session, ma_chai: str, session_id: int) -> dict:
     da_quet_hom_nay = (
         db.query(models.ScanEvent.id)
         .filter(models.ScanEvent.ma_chai == ma_chai,
+                models.ScanEvent.event_type == "SCAN",
                 models.ScanEvent.ket_qua == "OK",
                 func.date(models.ScanEvent.scanned_at, "localtime")
                 == func.date("now", "localtime"))

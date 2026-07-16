@@ -1,6 +1,6 @@
 // ── Màn hình PHÂN LOẠI ──
 let count = 0, ok = 0, err = 0;
-let activeBatchId = 1;
+let activeBatchId = null;
 
 // Hiện dev-bar nếu đang mock
 api("/api/is-mock").then(d => {
@@ -65,18 +65,37 @@ async function restoreScans() {
 }
 restoreScans();
 
-// Tải thông tin lô SX đang chạy
+// Hiển thị 1 lô SX lên panel "Thông tin chung" + đồng bộ biến activeBatchId.
+function showBatchInfo(b) {
+    if (!b) return;
+    activeBatchId = b.id;
+    document.getElementById("lo-sx").textContent = b.so_lo_san_xuat;
+    document.getElementById("ngay-sx").textContent = b.ngay_san_xuat;
+    refreshStartAvailability();
+}
+
+// "Bắt đầu" chỉ bật khi đã có lô SX được chọn (tránh chạy nhầm lô rỗng/cũ).
+function refreshStartAvailability() {
+    const btnStart = document.getElementById("btn-start");
+    const hint = document.getElementById("no-batch-hint");
+    if (hint) hint.style.display = activeBatchId == null ? "" : "none";
+    if (!btnStart || btnStart.dataset.sessionRunning === "1") return;
+    btnStart.disabled = activeBatchId == null;
+}
+
+// Tải thông tin lô SX: ưu tiên lô của ca đang chạy, nếu không có thì lấy lô
+// SX mới nhất (KHÔNG dùng giá trị mặc định cứng) để hiển thị sẵn.
 async function loadActiveInfo() {
     try {
         const sess = await api("/api/sessions/active?che_do=PHAN_LOAI");
+        const batches = await api("/api/identify/batches");
         if (sess.active) {
-            activeBatchId = sess.production_batch_id;
-            const batches = await api("/api/identify/batches");
-            const b = batches.find(x => x.id === activeBatchId);
-            if (b) {
-                document.getElementById("lo-sx").textContent = b.so_lo_san_xuat;
-                document.getElementById("ngay-sx").textContent = b.ngay_san_xuat;
-            }
+            const b = batches.find(x => x.id === sess.production_batch_id);
+            showBatchInfo(b);
+        } else if (batches.length) {
+            showBatchInfo(batches[0]); // mới nhất — chỉ để gợi ý, chưa phải đã chọn chắc chắn
+        } else {
+            refreshStartAvailability();
         }
     } catch {}
 }
@@ -145,6 +164,7 @@ function setSessionState(running) {
     const pill = document.getElementById("session-status");
     const btnStart = document.getElementById("btn-start");
     const btnEnd   = document.getElementById("btn-end");
+    btnStart.dataset.sessionRunning = running ? "1" : "0";
     if (running) {
         pill.textContent = "⬤ Ca đang chạy";
         pill.className   = "session-pill session-running";
@@ -153,8 +173,8 @@ function setSessionState(running) {
     } else {
         pill.textContent = "⬤ Chưa bắt đầu";
         pill.className   = "session-pill session-idle";
-        btnStart.disabled = false;
         btnEnd.disabled   = true;
+        refreshStartAvailability();
     }
 }
 
@@ -163,6 +183,7 @@ api("/api/sessions/active?che_do=PHAN_LOAI").then(d => setSessionState(d.active)
 
 // Bắt đầu ca
 document.getElementById("btn-start").onclick = async () => {
+    if (activeBatchId == null) { toast("Chưa có lô sản xuất — bấm \"Cập nhật lô SX\" trước", "err"); return; }
     try {
         await api("/api/sessions/start", "POST", {
             che_do: "PHAN_LOAI", production_batch_id: activeBatchId
@@ -170,7 +191,6 @@ document.getElementById("btn-start").onclick = async () => {
         clearScreen();              // ca mới → bắt đầu lại từ đầu
         setSessionState(true);
         toast("Đã bắt đầu ca phân loại", "ok");
-        loadActiveInfo();
     } catch (e) { toast(e.message, "err"); }
 };
 
@@ -181,6 +201,7 @@ document.getElementById("btn-end").onclick = async () => {
         setSessionState(false);
         toast(`Kết thúc ca — Hợp lệ: ${d.tong_hop_le}, Lỗi: ${d.tong_loi} `
               + `(đã lưu vào báo cáo)`, "info", 5000);
+        if (d.warning) toast(d.warning, "err", 8000);
         clearScreen();              // xóa hết hiển thị — data ca đã lưu DB
     } catch (e) { toast(e.message, "err"); }
 };
